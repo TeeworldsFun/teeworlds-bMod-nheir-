@@ -112,6 +112,9 @@ public:
 		int m_Max;
 	} m_Latency;
 
+	// Bot flag
+	bool m_IsBot;
+
 private:
 	CCharacter *m_pCharacter;
 	CGameContext *m_pGameServer;
