@@ -1037,6 +1037,11 @@ bool IGameController::GetStartRespawnState() const
 		return false;
 }
 
+bool IGameController::IsFlagGame() const
+{
+	return m_GameFlags&GAMEFLAG_FLAGS;
+}
+
 // team
 bool IGameController::CanChangeTeam(CPlayer *pPlayer, int JoinTeam) const
 {

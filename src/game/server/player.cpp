@@ -5,6 +5,7 @@
 #include "gamecontext.h"
 #include "gamecontroller.h"
 #include "player.h"
+#include "bot.h"
 
 
 MACRO_ALLOC_POOL_ID_IMPL(CPlayer, MAX_CLIENTS)
@@ -34,6 +35,8 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy)
 
 CPlayer::~CPlayer()
 {
+	if(m_pBot)
+		delete m_pBot;
 	delete m_pCharacter;
 	m_pCharacter = 0;
 }
@@ -212,6 +215,7 @@ void CPlayer::OnDirectInput(CNetObj_PlayerInput *NewInput)
 
 	if(NewInput->m_PlayerFlags&PLAYERFLAG_CHATTING)
 	{
+		dbg_msg("player","player %d is chatting", m_ClientID);
 		// skip the input if chat is active
 		if(m_PlayerFlags&PLAYERFLAG_CHATTING)
 			return;

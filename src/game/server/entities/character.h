@@ -58,7 +58,11 @@ public:
 	bool IsAlive() const { return m_Alive; }
 	class CPlayer *GetPlayer() { return m_pPlayer; }
 
-private:
+	// Need for bot (for now)
+	class CCharacterCore *GetCore() { return &m_Core;}
+
+//private: dirty hack
+public:
 	// player controlling this character
 	class CPlayer *m_pPlayer;
 

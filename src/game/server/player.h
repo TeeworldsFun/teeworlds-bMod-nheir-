@@ -116,6 +116,7 @@ public:
 
 	// Bot flag
 	bool m_IsBot;
+	class CBot *m_pBot;
 
 private:
 	CCharacter *m_pCharacter;

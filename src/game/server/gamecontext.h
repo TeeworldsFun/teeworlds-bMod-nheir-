@@ -12,6 +12,9 @@
 #include "eventhandler.h"
 #include "gameworld.h"
 
+#include "player.h"
+#include "botengine.h"
+
 /*
 	Tick
 		Game Context (CGameContext::tick)
@@ -119,6 +122,8 @@ public:
 	class CHeap *m_pVoteOptionHeap;
 	CVoteOptionServer *m_pVoteOptionFirst;
 	CVoteOptionServer *m_pVoteOptionLast;
+
+	class CBotEngine *m_pBotEngine;
 
 	// helper functions
 	void CreateDamageInd(vec2 Pos, float AngleMod, int Amount);

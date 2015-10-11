@@ -21,6 +21,8 @@
 #include "gamecontext.h"
 #include "player.h"
 
+#include "bot.h"
+
 enum
 {
 	RESET,
@@ -44,6 +46,7 @@ void CGameContext::Construct(int Resetting)
 
 	if(Resetting==NO_RESET)
 		m_pVoteOptionHeap = new CHeap();
+	m_pBotEngine = new CBotEngine(this);
 }
 
 CGameContext::CGameContext(int Resetting)
@@ -62,6 +65,7 @@ CGameContext::~CGameContext()
 		delete m_apPlayers[i];
 	if(!m_Resetting)
 		delete m_pVoteOptionHeap;
+	delete m_pBotEngine;
 }
 
 void CGameContext::Clear()
@@ -530,9 +534,12 @@ void CGameContext::OnTick()
 	{
 		if(!m_apPlayers[i] || !m_apPlayers[i]->m_IsBot)
 			continue;
-		CNetObj_PlayerInput Input = {0};
-		Input.m_Direction = (i&1)?-1:1;
-		m_apPlayers[i]->OnPredictedInput(&Input);
+		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
+		// Don't know why...
+		if(Server()->Tick()&1)
+			m_apPlayers[i]->OnPredictedInput(&Input);
+		else
+			m_apPlayers[i]->OnDirectInput(&Input);
 	}
 #ifdef CONF_DEBUG
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -666,6 +673,8 @@ void CGameContext::OnClientConnected(int ClientID, bool Dummy)
 
 	// send settings
 	SendSettings(ClientID);
+
+	CheckBotNumber();
 }
 
 void CGameContext::OnClientTeamChange(int ClientID)
@@ -1412,6 +1421,9 @@ void CGameContext::OnInit()
 	// create all entities from the game layer
 	CMapItemLayerTilemap *pTileMap = m_Layers.GameLayer();
 	CTile *pTiles = (CTile *)Kernel()->RequestInterface<IMap>()->GetData(pTileMap->m_Data);
+
+	m_pBotEngine->Init(pTiles, pTileMap->m_Width, pTileMap->m_Height);
+
 	for(int y = 0; y < pTileMap->m_Height; y++)
 	{
 		for(int x = 0; x < pTileMap->m_Width; x++)
@@ -1500,18 +1512,16 @@ void CGameContext::TryMoveBot(int ClientID)
 			break;
 	if(i < MAX_CLIENTS)
 	{
-		m_apPlayers[i] = m_apPlayers[ClientID];
+		dbg_msg("context","Move bot from slot %d to slot %d", ClientID, i);
+		m_apPlayers[i] = new(i) CPlayer(this, i, m_apPlayers[ClientID]->GetTeam());
+		*m_apPlayers[i] = *m_apPlayers[ClientID];
 		m_apPlayers[i]->SetCID(i);
 	}
-	else
-	{
-		delete m_apPlayers[ClientID];
-	}
+	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
 }
 
 void CGameContext::CheckBotNumber() {
-	dbg_msg("context","CheckBotNumber: %d", g_Config.m_SvBotSlots);
 	int BotNumber = 0;
 	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
 		if(!m_apPlayers[i])
@@ -1520,7 +1530,7 @@ void CGameContext::CheckBotNumber() {
 			BotNumber++;
 	}
 	int LastFreeSlot = MAX_CLIENTS-1;
-	for(int i = 0 ; i < g_Config.m_SvBotSlots ; i++) {
+	for(int i = 0 ; i < g_Config.m_SvBotSlots-BotNumber ; i++) {
 		for(; LastFreeSlot >= 0 ; LastFreeSlot--)
 			if(!m_apPlayers[LastFreeSlot])
 				break;
@@ -1529,6 +1539,7 @@ void CGameContext::CheckBotNumber() {
 			const int StartTeam = g_Config.m_SvTournamentMode ? TEAM_SPECTATORS : m_pController->GetAutoTeam(LastFreeSlot);
 			m_apPlayers[LastFreeSlot] = new(LastFreeSlot) CPlayer(this, LastFreeSlot, StartTeam);
 			m_apPlayers[LastFreeSlot]->m_IsBot = true;
+			m_apPlayers[LastFreeSlot]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[LastFreeSlot]);
 		}
 	}
 }
