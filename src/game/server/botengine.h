@@ -99,6 +99,7 @@ public:
 
   int GetWidth() { return m_Width; }
   CGraph *GetGraph() { return &m_Graph; }
+  int GetFlagStandPos(int Team) { return m_aFlagTiles[Team&1]; }
 
   int GetTile(int x, int y);
   int GetTile(int i) { return GetTile(i % m_Width, i / m_Width); };

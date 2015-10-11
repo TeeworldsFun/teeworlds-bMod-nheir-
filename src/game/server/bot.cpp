@@ -26,7 +26,7 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 	mem_zero(m_AmmoCount, sizeof(m_AmmoCount));
 	m_AmmoCount[WEAPON_HAMMER] = -1;
 	m_Weapon = WEAPON_GUN;
-	m_InputData = {0};
+	mem_zero(&m_InputData, sizeof(m_InputData));
 }
 
 CBot::~CBot()
@@ -129,31 +129,31 @@ CNetObj_PlayerInput CBot::GetInputData()
 		m_Fire = false;
 		m_InputData.m_WantedWeapon = WEAPON_GUN +1;
 
-		// if(m_pClient->m_Snap.m_pGameDataObj)
-		// {
-		// 	int myFlagOwner = (Team == TEAM_BLUE) ? m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierBlue : m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierRed;
-		// 	int thFlagOwner = (Team == TEAM_RED) ? m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierBlue : m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierRed;
-		//
-		// 	if(m_pClient->m_Snap.m_paFlags[Team])
-		// 	{
-		// 		vec2 myFlag(m_pClient->m_Snap.m_paFlags[Team]->m_X, m_pClient->m_Snap.m_paFlags[Team]->m_Y);
-		// 		if(!(Collision()->IntersectLine(pMe->m_Pos,myFlag,0,0)) and (myFlagOwner == FLAG_TAKEN or thFlagOwner == m_pClient->m_Snap.m_LocalClientID))
-		// 		{
-		// 			m_Target = myFlag - pMe->m_Pos;
-		// 			m_State = BOT_FLAG;
-		// 		}
-		// 	}
-		// 	if(m_pClient->m_Snap.m_paFlags[Team^1])
-		// 	{
-		// 		vec2 thFlag(m_pClient->m_Snap.m_paFlags[Team^1]->m_X, m_pClient->m_Snap.m_paFlags[Team^1]->m_Y);
-		//
-		// 		if(m_State != BOT_FLAG and !(Collision()->IntersectLine(pMe->m_Pos,thFlag,0,0)) and thFlagOwner < 0)
-		// 		{
-		// 			m_Target = thFlag - pMe->m_Pos;
-		// 			m_State = BOT_FLAG;
-		// 		}
-		// 	}
-		// }
+		if(GameServer()->m_pController->IsFlagGame())
+		{
+			CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
+			CFlag **apFlags = pController->m_apFlags;
+
+			if(apFlags[Team])
+			{
+				vec2 myFlag = apFlags[Team]->m_Pos;
+				if(!(Collision()->IntersectLine(pMe->m_Pos,myFlag,0,0)) and ( !apFlags[Team]->m_AtStand or apFlags[Team^1]->m_pCarryingCharacter == m_pPlayer->GetCharacter()))
+				{
+					m_Target = myFlag - pMe->m_Pos;
+					m_State = BOT_FLAG;
+				}
+			}
+			if(apFlags[Team^1])
+			{
+				vec2 thFlag = apFlags[Team^1]->m_Pos;
+
+				if(m_State != BOT_FLAG and !(Collision()->IntersectLine(pMe->m_Pos,thFlag,0,0)) && !apFlags[Team^1]->m_pCarryingCharacter)
+				{
+					m_Target = thFlag - pMe->m_Pos;
+					m_State = BOT_FLAG;
+				}
+			}
+		}
 		if(m_State == BOT_FLAG and rand()%2)
 			MakeChoice2(true);
 		else
@@ -194,11 +194,14 @@ CNetObj_PlayerInput CBot::GetInputData()
 	HandleWeapon(pClosest);
 	diffPos = m_Target;
 
-	// int thFlagOwner = -1;
-	// if(m_pClient->m_Snap.m_pGameDataObj)
-	// 	thFlagOwner = (Team == TEAM_RED) ? m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierBlue : m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierRed;
-	// bool UseTarget = thFlagOwner != m_pClient->m_Snap.m_LocalClientID or ClosestRange < m_HookLength*0.9f;
-	MakeChoice2(true);
+	bool UseTarget = ClosestRange < m_HookLength*0.9f;
+	if(GameServer()->m_pController->IsFlagGame()) {
+		CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
+		CFlag **apFlags = pController->m_apFlags;
+		if(apFlags[Team^1])
+			UseTarget = UseTarget || apFlags[Team^1]->m_pCarryingCharacter != m_pPlayer->GetCharacter();
+	}
+	MakeChoice2(UseTarget);
 
 	if(m_Flags & BFLAG_LEFT)
 			m_InputData.m_Direction = -1;
@@ -223,7 +226,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 		m_InputData.m_Hook ^= 1;
 	}
 
-	m_Target = (true) ? m_Target : diffPos;
+	m_Target = (UseTarget) ? m_Target : diffPos;
 	m_InputData.m_TargetX = m_Target.x;
 	m_InputData.m_TargetY = m_Target.y;
 
@@ -392,16 +395,20 @@ void CBot::UpdateEdge(bool Reset)
 	if(NewStart > -1)
 	{
 		m_WalkStart = GameServer()->Server()->Tick();
-		int Team = m_pPlayer->GetTeam();
-		//int myFlagOwner = (Team == TEAM_BLUE) ? m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierBlue : m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierRed;
-		int thFlagOwner = -1;
-		// if(m_pClient->m_Snap.m_pGameDataObj)
-		// 	thFlagOwner = (Team == TEAM_RED) ? m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierBlue : m_pClient->m_Snap.m_pGameDataObj->m_FlagCarrierRed;
 		int NewEnd = -1;
-		// if(thFlagOwner == FLAG_ATSTAND)
-		// 	NewEnd = m_aFlagTiles[Team^1];
-		// if(thFlagOwner == m_pClient->m_Snap.m_LocalClientID)
-		// 	NewEnd = m_aFlagTiles[Team];
+		if(GameServer()->m_pController->IsFlagGame()) {
+			int Team = m_pPlayer->GetTeam();
+			CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
+			CFlag **apFlags = pController->m_apFlags;
+			if(apFlags[Team^1])
+			{
+				if(apFlags[Team^1]->m_AtStand)
+					NewEnd = BotEngine()->GetFlagStandPos(Team^1);
+				if(apFlags[Team^1]->m_pCarryingCharacter == m_pPlayer->GetCharacter())
+					NewEnd = BotEngine()->GetFlagStandPos(Team);
+			}
+		}
+
 		if(NewEnd < 0)
 		{
 			int r = rand()%(BotEngine()->GetGraph()->m_NumVertices-1);
@@ -476,8 +483,6 @@ void CBot::MakeChoice(bool UseTarget)
 	TempChar.Move();
 	TempChar.Quantize();
 
-	vec2 Target = m_Target;
-
 	int NextTile = GetTile(TempChar.m_Pos.x, TempChar.m_Pos.y);
 	vec2 NextPos = TempChar.m_Pos;
 
@@ -515,8 +520,6 @@ void CBot::MakeChoice(bool UseTarget)
 	if(pMe->m_HookState == HOOK_GRABBED and pMe->m_HookedPlayer == -1)
 	{
 		vec2 HookVel = normalize(pMe->m_HookPos-pMe->m_Pos)*TempWorld.m_Tuning.m_HookDragAccel;
-		float Acc = Grounded ? TempWorld.m_Tuning.m_GroundControlAccel : TempWorld.m_Tuning.m_AirControlAccel;
-		vec2 Accel = vec2((Flags & BFLAG_RIGHT) ? Acc : -Acc,0);
 
 		// from gamecore;cpp
 		if(HookVel.y > 0)
@@ -546,8 +549,6 @@ void CBot::MakeChoice(bool UseTarget)
 		vec2 HookDir(0.0f,0.0f);
 		float MaxForce = (CurTile & BTILE_HOLE) ? -10000.0f : 0;
 		vec2 Target = (UseTarget) ? m_Target : pMe->m_Vel;
-		float Acc = Grounded ? TempWorld.m_Tuning.m_GroundControlAccel : TempWorld.m_Tuning.m_AirControlAccel;
-		vec2 Accel = vec2((Flags & BFLAG_RIGHT) ? Acc : -Acc,0);
 		for(int i = 0 ; i < NumDir; i++)
 		{
 			float a = 2*i*pi / NumDir;
