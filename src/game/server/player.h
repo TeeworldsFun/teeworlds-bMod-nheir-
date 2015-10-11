@@ -30,6 +30,8 @@ public:
 	int GetTeam() const { return m_Team; };
 	int GetCID() const { return m_ClientID; };
 	bool IsDummy() const { return m_Dummy; }
+	bool IsBot() const { return m_IsBot; }
+	void SetCID(int ClientID);
 
 	void Tick();
 	void PostTick();

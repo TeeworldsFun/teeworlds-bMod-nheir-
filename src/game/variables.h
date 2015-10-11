@@ -117,7 +117,7 @@ MACRO_CONFIG_INT(SvVoteKickMin, sv_vote_kick_min, 0, 0, MAX_CLIENTS, CFGFLAG_SAV
 MACRO_CONFIG_INT(SvVoteKickBantime, sv_vote_kick_bantime, 5, 0, 1440, CFGFLAG_SAVE|CFGFLAG_SERVER, "The time to ban a player if kicked by vote. 0 makes it just use kick")
 
 //Server Bots
-MACRO_CONFIG_INT(SvBotSlots, sv_bot_slots, 2, 0, MAX_CLIENTS >> 1, CFGFLAG_SERVER, "Number of slots to reserve for bots")
+MACRO_CONFIG_INT(SvBotSlots, sv_bot_slots, 2, 0, MAX_CLIENTS, CFGFLAG_SERVER, "Number of slots to reserve for bots")
 
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly

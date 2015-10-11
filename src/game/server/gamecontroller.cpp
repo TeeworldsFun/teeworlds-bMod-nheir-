@@ -60,7 +60,7 @@ void IGameController::DoActivityCheck()
 
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
-		if(GameServer()->m_apPlayers[i] && !GameServer()->m_apPlayers[i]->IsDummy() && GameServer()->m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS &&
+		if(GameServer()->m_apPlayers[i] && !GameServer()->m_apPlayers[i]->IsDummy() && !GameServer()->m_apPlayers[i]->IsBot() && GameServer()->m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS &&
 			!Server()->IsAuthed(i) && (GameServer()->m_apPlayers[i]->m_InactivityTickCounter > g_Config.m_SvInactiveKickTime*Server()->TickSpeed()*60))
 		{
 			switch(g_Config.m_SvInactiveKick)
@@ -456,7 +456,7 @@ void IGameController::ResetGame()
 {
 	// reset the game
 	GameServer()->m_World.m_ResetRequested = true;
-	
+
 	SetGameState(IGS_GAME_RUNNING);
 	m_GameStartTick = Server()->Tick();
 	m_SuddenDeath = 0;
@@ -491,7 +491,7 @@ void IGameController::SetGameState(EGameState GameState, int Timer)
 				// run warmup till there're enough players
 				m_GameState = GameState;
  				m_GameStateTimer = TIMER_INFINITE;
-		
+
 				// enable respawning in survival when activating warmup
 				if(m_GameFlags&GAMEFLAG_SURVIVAL)
 				{
@@ -527,7 +527,7 @@ void IGameController::SetGameState(EGameState GameState, int Timer)
 					m_GameState = GameState;
 					m_GameStateTimer = Timer*Server()->TickSpeed();
 				}
-		
+
 				// enable respawning in survival when activating warmup
 				if(m_GameFlags&GAMEFLAG_SURVIVAL)
 				{

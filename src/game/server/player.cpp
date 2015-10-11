@@ -40,7 +40,7 @@ CPlayer::~CPlayer()
 
 void CPlayer::Tick()
 {
-	if(!IsDummy() && !Server()->ClientIngame(m_ClientID))
+	if(!IsDummy() && !IsBot() && !Server()->ClientIngame(m_ClientID))
 		return;
 
 	Server()->SetClientScore(m_ClientID, m_Score);
@@ -120,7 +120,7 @@ void CPlayer::PostTick()
 
 void CPlayer::Snap(int SnappingClient)
 {
-	if(!IsDummy() && !Server()->ClientIngame(m_ClientID))
+	if(!IsDummy() && !IsBot() && !Server()->ClientIngame(m_ClientID))
 		return;
 
 	CNetObj_PlayerInfo *pPlayerInfo = static_cast<CNetObj_PlayerInfo *>(Server()->SnapNewItem(NETOBJTYPE_PLAYERINFO, m_ClientID, sizeof(CNetObj_PlayerInfo)));
@@ -370,4 +370,9 @@ void CPlayer::TryRespawn()
 	m_pCharacter = new(m_ClientID) CCharacter(&GameServer()->m_World);
 	m_pCharacter->Spawn(this, SpawnPos);
 	GameServer()->CreatePlayerSpawn(SpawnPos);
+}
+
+void CPlayer::SetCID(int ClientID) {
+	if(m_IsBot)
+		m_ClientID = ClientID;
 }

@@ -153,6 +153,10 @@ public:
 	void CheckPureTuning();
 	void SendTuningParams(int ClientID);
 
+	// Bot slots
+	void TryMoveBot(int ClientID);
+	void CheckBotNumber();
+
 	//
 	void SwapTeams();
 

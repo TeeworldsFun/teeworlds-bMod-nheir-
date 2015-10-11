@@ -427,7 +427,7 @@ void CGameContext::SwapTeams()
 {
 	if(!m_pController->IsTeamplay())
 		return;
-	
+
 	SendGameMsg(GAMEMSG_TEAM_SWAP, -1);
 
 	for(int i = 0; i < MAX_CLIENTS; ++i)
@@ -525,7 +525,15 @@ void CGameContext::OnTick()
 		}
 	}
 
-
+	// Test basic move for bots
+	for(int i = 0; i < MAX_CLIENTS ; i++)
+	{
+		if(!m_apPlayers[i] || !m_apPlayers[i]->m_IsBot)
+			continue;
+		CNetObj_PlayerInput Input = {0};
+		Input.m_Direction = (i&1)?-1:1;
+		m_apPlayers[i]->OnPredictedInput(&Input);
+	}
 #ifdef CONF_DEBUG
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -595,11 +603,11 @@ void CGameContext::OnClientEnter(int ClientID)
 		NewClientInfoMsg.m_aUseCustomColors[p] = m_apPlayers[ClientID]->m_TeeInfos.m_aUseCustomColors[p];
 		NewClientInfoMsg.m_aSkinPartColors[p] = m_apPlayers[ClientID]->m_TeeInfos.m_aSkinPartColors[p];
 	}
-	
+
 
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
-		if(i == ClientID || !m_apPlayers[i] || (!Server()->ClientIngame(i) && !m_apPlayers[i]->IsDummy()))
+		if(i == ClientID || !m_apPlayers[i] || (!Server()->ClientIngame(i) && !m_apPlayers[i]->IsDummy() && !m_apPlayers[i]->IsBot()))
 			continue;
 
 		// new info for others
@@ -625,7 +633,7 @@ void CGameContext::OnClientEnter(int ClientID)
 
 	// local info
 	NewClientInfoMsg.m_Local = 1;
-	Server()->SendPackMsg(&NewClientInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, ClientID);	
+	Server()->SendPackMsg(&NewClientInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, ClientID);
 
 	if(Server()->DemoRecorder_IsRecording())
 	{
@@ -638,8 +646,14 @@ void CGameContext::OnClientEnter(int ClientID)
 
 void CGameContext::OnClientConnected(int ClientID, bool Dummy)
 {
+	if(m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsBot())
+	{
+		delete m_apPlayers[ClientID];
+		m_apPlayers[ClientID] = 0;
+	}
+
 	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, Dummy);
-	
+
 	if(Dummy)
 		return;
 
@@ -672,7 +686,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 			Msg.m_pReason = pReason;
 			Server()->SendPackMsg(&Msg, MSGFLAG_NOSEND, -1);
 		}
-		
+
 		CNetMsg_Sv_ClientDrop Msg;
 		Msg.m_ClientID = ClientID;
 		Msg.m_pReason = pReason;
@@ -712,7 +726,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 
 			CNetMsg_Cl_Say *pMsg = (CNetMsg_Cl_Say *)pRawMsg;
 			int Team = pMsg->m_Team ? pPlayer->GetTeam() : CGameContext::CHAT_ALL;
-			
+
 			// trim right and set maximum length to 128 utf8-characters
 			int Length = 0;
 			const char *p = pMsg->m_pMessage;
@@ -772,7 +786,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 					(pPlayer->m_LastVoteCall && pPlayer->m_LastVoteCall+Server()->TickSpeed()*VOTE_COOLDOWN > Now))) ||
 					pPlayer->GetTeam() == TEAM_SPECTATORS || m_VoteCloseTime)
 					return;
-				
+
 				pPlayer->m_LastVoteTry = Now;
 			}
 
@@ -889,7 +903,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			CNetMsg_Cl_SetTeam *pMsg = (CNetMsg_Cl_SetTeam *)pRawMsg;
 
 			if(pPlayer->GetTeam() == pMsg->m_Team ||
-				(g_Config.m_SvSpamprotection && pPlayer->m_LastSetTeam && pPlayer->m_LastSetTeam+Server()->TickSpeed()*3 > Server()->Tick()) || 
+				(g_Config.m_SvSpamprotection && pPlayer->m_LastSetTeam && pPlayer->m_LastSetTeam+Server()->TickSpeed()*3 > Server()->Tick()) ||
 				(pMsg->m_Team != TEAM_SPECTATORS && m_LockTeams) || pPlayer->m_TeamChangeTick > Server()->Tick())
 				return;
 
@@ -1133,7 +1147,7 @@ void CGameContext::ConShuffleTeams(IConsole::IResult *pResult, void *pUserData)
 	rnd = PlayerTeam % 2 ? random_int() % 2 : 0;
 
 	for(int i = 0; i < PlayerTeam; i++)
-		pSelf->m_pController->DoTeamChange(pSelf->m_apPlayers[aPlayer[i]], i < (PlayerTeam+rnd)/2 ? TEAM_RED : TEAM_BLUE, false); 
+		pSelf->m_pController->DoTeamChange(pSelf->m_apPlayers[aPlayer[i]], i < (PlayerTeam+rnd)/2 ? TEAM_RED : TEAM_BLUE, false);
 }
 
 void CGameContext::ConLockTeams(IConsole::IResult *pResult, void *pUserData)
@@ -1419,6 +1433,8 @@ void CGameContext::OnInit()
 			OnClientConnected(MAX_CLIENTS-i-1, true);
 	}
 #endif
+
+	CheckBotNumber();
 }
 
 void CGameContext::OnShutdown()
@@ -1473,3 +1489,46 @@ const char *CGameContext::Version() const { return GAME_VERSION; }
 const char *CGameContext::NetVersion() const { return GAME_NETVERSION; }
 
 IGameServer *CreateGameServer() { return new CGameContext; }
+
+void CGameContext::TryMoveBot(int ClientID)
+{
+	if(!m_apPlayers[ClientID] or !m_apPlayers[ClientID]->m_IsBot)
+		return;
+	int i;
+	for(i=0 ; i<MAX_CLIENTS ; i++)
+		if(!m_apPlayers[i])
+			break;
+	if(i < MAX_CLIENTS)
+	{
+		m_apPlayers[i] = m_apPlayers[ClientID];
+		m_apPlayers[i]->SetCID(i);
+	}
+	else
+	{
+		delete m_apPlayers[ClientID];
+	}
+	m_apPlayers[ClientID] = 0;
+}
+
+void CGameContext::CheckBotNumber() {
+	dbg_msg("context","CheckBotNumber: %d", g_Config.m_SvBotSlots);
+	int BotNumber = 0;
+	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
+		if(!m_apPlayers[i])
+			continue;
+		if(m_apPlayers[i]->m_IsBot)
+			BotNumber++;
+	}
+	int LastFreeSlot = MAX_CLIENTS-1;
+	for(int i = 0 ; i < g_Config.m_SvBotSlots ; i++) {
+		for(; LastFreeSlot >= 0 ; LastFreeSlot--)
+			if(!m_apPlayers[LastFreeSlot])
+				break;
+		if( LastFreeSlot >= 0) {
+			dbg_msg("context","Add a bot at slot: %d", LastFreeSlot);
+			const int StartTeam = g_Config.m_SvTournamentMode ? TEAM_SPECTATORS : m_pController->GetAutoTeam(LastFreeSlot);
+			m_apPlayers[LastFreeSlot] = new(LastFreeSlot) CPlayer(this, LastFreeSlot, StartTeam);
+			m_apPlayers[LastFreeSlot]->m_IsBot = true;
+		}
+	}
+}
