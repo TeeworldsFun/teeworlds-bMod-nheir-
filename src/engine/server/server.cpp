@@ -541,7 +541,7 @@ int CServer::SendMsg(CMsgPacker *pMsg, int Flags, int ClientID)
 					m_NetServer.Send(&Packet);
 				}
 		}
-		else
+		else if(m_aClients[ClientID].m_State != CClient::STATE_EMPTY) //Test pour ne rien envoyer à un bot
 			m_NetServer.Send(&Packet);
 	}
 	return 0;
@@ -1752,4 +1752,3 @@ int main(int argc, const char **argv) // ignore_convention
 
 	return 0;
 }
-
