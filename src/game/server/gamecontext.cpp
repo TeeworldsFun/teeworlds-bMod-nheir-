@@ -536,10 +536,8 @@ void CGameContext::OnTick()
 			continue;
 		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
 		// Don't know why...
-		if(Server()->Tick()&1)
-			m_apPlayers[i]->OnPredictedInput(&Input);
-		else
-			m_apPlayers[i]->OnDirectInput(&Input);
+		m_apPlayers[i]->OnPredictedInput(&Input);
+		m_apPlayers[i]->OnDirectInput(&Input);
 	}
 #ifdef CONF_DEBUG
 	for(int i = 0; i < MAX_CLIENTS; i++)
