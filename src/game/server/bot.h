@@ -121,6 +121,7 @@ public:
 	virtual void OnReset();
 
 	CNetObj_PlayerInput GetInputData();
+	CNetObj_PlayerInput GetLastInputData() { return m_LastData; }
 };
 
 #endif

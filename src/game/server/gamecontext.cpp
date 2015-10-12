@@ -446,6 +446,15 @@ void CGameContext::OnTick()
 	// check tuning
 	CheckPureTuning();
 
+	// Test basic move for bots
+	for(int i = 0; i < MAX_CLIENTS ; i++)
+	{
+		if(!m_apPlayers[i] || !m_apPlayers[i]->m_IsBot)
+			continue;
+		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetLastInputData();
+		m_apPlayers[i]->OnPredictedInput(&Input);
+	}
+
 	// copy tuning
 	m_World.m_Core.m_Tuning = m_Tuning;
 	m_World.Tick();
@@ -535,8 +544,6 @@ void CGameContext::OnTick()
 		if(!m_apPlayers[i] || !m_apPlayers[i]->m_IsBot)
 			continue;
 		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
-		// Don't know why...
-		m_apPlayers[i]->OnPredictedInput(&Input);
 		m_apPlayers[i]->OnDirectInput(&Input);
 	}
 #ifdef CONF_DEBUG
