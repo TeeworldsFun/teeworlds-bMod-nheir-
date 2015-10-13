@@ -140,6 +140,10 @@ void CPlayer::Snap(int SnappingClient)
 	if(SnappingClient != -1 && (m_Team == TEAM_SPECTATORS || m_DeadSpecMode) && SnappingClient == m_SpectatorID)
 		pPlayerInfo->m_PlayerFlags |= PLAYERFLAG_WATCHING;
 	pPlayerInfo->m_Latency = SnappingClient == -1 ? m_Latency.m_Min : GameServer()->m_apPlayers[SnappingClient]->m_aActLatency[m_ClientID];
+
+	if(IsBot())
+		pPlayerInfo->m_Latency = 0;
+
 	pPlayerInfo->m_Score = m_Score;
 
 	if(m_ClientID == SnappingClient && (m_Team == TEAM_SPECTATORS || m_DeadSpecMode))
