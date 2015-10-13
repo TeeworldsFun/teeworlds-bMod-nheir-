@@ -446,6 +446,9 @@ void CGameContext::OnTick()
 	// check tuning
 	CheckPureTuning();
 
+	// Check bot number
+	CheckBotNumber();
+
 	// Test basic move for bots
 	for(int i = 0; i < MAX_CLIENTS ; i++)
 	{
@@ -1536,17 +1539,35 @@ void CGameContext::CheckBotNumber() {
 		if(m_apPlayers[i]->m_IsBot)
 			BotNumber++;
 	}
-	int LastFreeSlot = MAX_CLIENTS-1;
-	for(int i = 0 ; i < g_Config.m_SvBotSlots-BotNumber ; i++) {
-		for(; LastFreeSlot >= 0 ; LastFreeSlot--)
-			if(!m_apPlayers[LastFreeSlot])
-				break;
-		if( LastFreeSlot >= 0) {
-			dbg_msg("context","Add a bot at slot: %d", LastFreeSlot);
-			const int StartTeam = g_Config.m_SvTournamentMode ? TEAM_SPECTATORS : m_pController->GetAutoTeam(LastFreeSlot);
-			m_apPlayers[LastFreeSlot] = new(LastFreeSlot) CPlayer(this, LastFreeSlot, StartTeam);
-			m_apPlayers[LastFreeSlot]->m_IsBot = true;
-			m_apPlayers[LastFreeSlot]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[LastFreeSlot]);
+	// Remove bot excedent
+	if(BotNumber-g_Config.m_SvBotSlots > 0)	{
+		int FirstBot = 0;
+		for(int i = 0 ; i < BotNumber-g_Config.m_SvBotSlots ; i++) {
+			for(; FirstBot < MAX_CLIENTS ; FirstBot++)
+				if(m_apPlayers[FirstBot] && m_apPlayers[i]->m_IsBot)
+					break;
+			if(FirstBot < MAX_CLIENTS) {
+				delete m_apPlayers[FirstBot];
+				m_apPlayers[FirstBot] = 0;
+			}
+		}
+	}
+	// Add missing bot if possible
+	if(g_Config.m_SvBotSlots-BotNumber > 0) {
+		int LastFreeSlot = Server()->MaxClients()-1;
+		for(int i = 0 ; i < g_Config.m_SvBotSlots-BotNumber ; i++) {
+			for(; LastFreeSlot >= 0 ; LastFreeSlot--)
+				if(!m_apPlayers[LastFreeSlot])
+					break;
+			if( LastFreeSlot >= 0) {
+				dbg_msg("context","Add a bot at slot: %d", LastFreeSlot);
+				const int StartTeam = g_Config.m_SvTournamentMode ? TEAM_SPECTATORS : m_pController->GetAutoTeam(LastFreeSlot);
+				if(StartTeam == TEAM_SPECTATORS)
+					break;
+				m_apPlayers[LastFreeSlot] = new(LastFreeSlot) CPlayer(this, LastFreeSlot, StartTeam);
+				m_apPlayers[LastFreeSlot]->m_IsBot = true;
+				m_apPlayers[LastFreeSlot]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[LastFreeSlot]);
+			}
 		}
 	}
 }
