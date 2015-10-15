@@ -103,7 +103,6 @@ public:
 
   int GetTile(int x, int y);
   int GetTile(int i) { return GetTile(i % m_Width, i / m_Width); };
-	int GetTile(float x, float y) { return GetTile(round(x), round(y)); }
 
 	CEdge* GetClosestEdge(vec2 Pos, float ClosestRange);
 

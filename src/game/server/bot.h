@@ -109,7 +109,6 @@ protected:
 
 	int GetTile(int x, int y) { return BotEngine()->GetTile(x,y);}
 	int GetTile(int i) { return BotEngine()->GetTile(i);}
-	int GetTile(float x, float y) { return GetTile(round(x), round(y)); }
 
 public:
 	CBot(class CBotEngine *m_pBotEngine, CPlayer *pPlayer);

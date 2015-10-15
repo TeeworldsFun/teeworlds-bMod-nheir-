@@ -1,4 +1,3 @@
-#include <game/generated/protocol.h>
 #include <game/gamecore.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
@@ -672,7 +671,7 @@ CEdge* CBotEngine::GetClosestEdge(vec2 Pos, float ClosestRange)
 				vec2 VertexPos(Index % m_Width, Index / m_Width);
 				VertexPos *= 32;
 				VertexPos += vec2(16,16);
-				vec2 W = GetDir(GetAngle(normalize(VertexPos-Pos))+pi/2)*16.f;
+				vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*16.f;
 				if(!(GameServer()->Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) and !(GameServer()->Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
 				{
 					ClosestRange = D;
@@ -702,7 +701,7 @@ CEdge* CBotEngine::GetClosestEdge(vec2 Pos, float ClosestRange)
 // 			vec2 VertexPos(Index % m_Width, Index / m_Width);
 // 			VertexPos *= 32;
 // 			VertexPos += vec2(16,16);
-// 			vec2 W = GetDir(GetAngle(normalize(VertexPos-Pos))+pi/2)*16.f;
+// 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*16.f;
 // 			if(!(Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) and !(Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
 // 			{
 // 				ClosestRange = D;

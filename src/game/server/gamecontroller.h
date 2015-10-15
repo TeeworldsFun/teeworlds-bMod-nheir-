@@ -116,8 +116,6 @@ protected:
 	} m_GameInfo;
 
 	void UpdateGameInfo(int ClientID);
-	bool IsTeamplay() const;
-	bool IsFlagGame() const;
 
 public:
 	IGameController(class CGameContext *pGameServer);
@@ -194,6 +192,7 @@ public:
 	bool IsPlayerReadyMode() const;
 	bool IsTeamChangeAllowed() const;
 	bool IsTeamplay() const { return m_GameFlags&GAMEFLAG_TEAMS; }
+	bool IsFlagGame() const { return m_GameFlags&GAMEFLAG_FLAGS; };
 
 	const char *GetGameType() const { return m_pGameType; }
 

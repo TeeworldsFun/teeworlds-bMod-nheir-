@@ -10,14 +10,14 @@ class CGameControllerCTF : public IGameController
 	// balancing
 	virtual bool CanBeMovedOnBalance(int ClientID) const;
 
-	// game
-	class CFlag *m_apFlags[2];
-
 	virtual void DoWincheckMatch();
 
 public:
 	CGameControllerCTF(class CGameContext *pGameServer);
-	
+
+	// game
+	class CFlag *m_apFlags[2];
+
 	// event
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
 	virtual void OnFlagReturn(class CFlag *pFlag);
@@ -29,4 +29,3 @@ public:
 };
 
 #endif
-

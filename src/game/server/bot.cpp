@@ -1,4 +1,3 @@
-#include <game/generated/protocol.h>
 #include <game/gamecore.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
@@ -6,8 +5,6 @@
 #include "gamecontext.h"
 
 #include "gamemodes/ctf.h"
-
-#include "botengine.h"
 
 #include "bot.h"
 #include "player.h"
@@ -51,15 +48,15 @@ int CBot::GetTarget()
 	if(Team >= 0 && (GameServer()->m_pController->IsFlagGame()))
 	{
 		CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
-		if(pController->m_apFlags[Team] && !pController->m_apFlags[Team]->m_AtStand && pController->m_apFlags[Team]->m_pCarryingCharacter && pController->m_apFlags[Team]->m_pCarryingCharacter->GetPlayer())
-				FlagCarrier = pController->m_apFlags[Team]->m_pCarryingCharacter->GetPlayer()->GetCID();
+		if(pController->m_apFlags[Team] && !pController->m_apFlags[Team]->IsAtStand() && pController->m_apFlags[Team]->GetCarrier() && pController->m_apFlags[Team]->GetCarrier()->GetPlayer())
+				FlagCarrier = pController->m_apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
 	}
-	vec2 Pos = m_pPlayer->GetCharacter()->m_Pos;
+	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 	if(FlagCarrier < 0)
 		if(m_TargetClient >=0 && m_TargetClient < MAX_CLIENTS)
 		{
 			CPlayer *pClosest = GameServer()->m_apPlayers[m_TargetClient];
-			if(pClosest && (pClosest->GetTeam() != Team || IsDM) && pClosest->GetCharacter() && !(Collision()->IntersectLine(Pos, pClosest->GetCharacter()->m_Pos,0,0)))
+			if(pClosest && (pClosest->GetTeam() != Team || IsDM) && pClosest->GetCharacter() && !(Collision()->IntersectLine(Pos, pClosest->GetCharacter()->GetPos(),0,0)))
 				return m_TargetClient;
 		}
 
@@ -73,9 +70,9 @@ int CBot::GetTarget()
 		if(c == m_pPlayer->GetCID())
 			continue;
 		CPlayer *pClosest = GameServer()->m_apPlayers[c];
-		if(pClosest && (pClosest->GetTeam() != Team || IsDM) && pClosest->GetCharacter() && !(Collision()->IntersectLine(Pos, pClosest->GetCharacter()->m_Pos,0,0)))
+		if(pClosest && (pClosest->GetTeam() != Team || IsDM) && pClosest->GetCharacter() && !(Collision()->IntersectLine(Pos, pClosest->GetCharacter()->GetPos(),0,0)))
 		{
-			float Len = distance(Pos, pClosest->GetCharacter()->m_Pos);
+			float Len = distance(Pos, pClosest->GetCharacter()->GetPos());
 			if(Len < Radius)
 			{
 				if(c == FlagCarrier && Len < m_HookLength)
@@ -96,7 +93,7 @@ int CBot::GetTarget()
 
 bool CBot::IsGrounded()
 {
-	vec2 Pos = m_pPlayer->GetCharacter()->m_Pos;
+	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 
 	float PhysSize = 28.0f;
 
@@ -136,8 +133,8 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 			if(apFlags[Team])
 			{
-				vec2 myFlag = apFlags[Team]->m_Pos;
-				if(!(Collision()->IntersectLine(pMe->m_Pos,myFlag,0,0)) and ( !apFlags[Team]->m_AtStand or apFlags[Team^1]->m_pCarryingCharacter == m_pPlayer->GetCharacter()))
+				vec2 myFlag = apFlags[Team]->GetPos();
+				if(!(Collision()->IntersectLine(pMe->m_Pos,myFlag,0,0)) and ( !apFlags[Team]->IsAtStand() or apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter()))
 				{
 					m_Target = myFlag - pMe->m_Pos;
 					m_State = BOT_FLAG;
@@ -145,9 +142,9 @@ CNetObj_PlayerInput CBot::GetInputData()
 			}
 			if(apFlags[Team^1])
 			{
-				vec2 thFlag = apFlags[Team^1]->m_Pos;
+				vec2 thFlag = apFlags[Team^1]->GetPos();
 
-				if(m_State != BOT_FLAG and !(Collision()->IntersectLine(pMe->m_Pos,thFlag,0,0)) && !apFlags[Team^1]->m_pCarryingCharacter)
+				if(m_State != BOT_FLAG and !(Collision()->IntersectLine(pMe->m_Pos,thFlag,0,0)) && !apFlags[Team^1]->GetCarrier())
 				{
 					m_Target = thFlag - pMe->m_Pos;
 					m_State = BOT_FLAG;
@@ -199,7 +196,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 		CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
 		CFlag **apFlags = pController->m_apFlags;
 		if(apFlags[Team^1])
-			UseTarget = UseTarget || apFlags[Team^1]->m_pCarryingCharacter != m_pPlayer->GetCharacter();
+			UseTarget = UseTarget || apFlags[Team^1]->GetCarrier() != m_pPlayer->GetCharacter();
 	}
 	MakeChoice2(UseTarget);
 
@@ -241,7 +238,7 @@ void CBot::HandleWeapon(const CCharacterCore *pTarget)
 	if(!pTarget || !pMe)
 		return;
 
-	vec2 Pos = pMe->m_Pos;
+	vec2 Pos = pMe->GetCore()->m_Pos;
 	vec2 Vel = pMe->GetCore()->m_Vel;
 	float ClosestRange = distance(Pos+Vel, pTarget->m_Pos+pTarget->m_Vel);
 	float Close = 65.0f;
@@ -257,9 +254,9 @@ void CBot::HandleWeapon(const CCharacterCore *pTarget)
 	else
 	{
 		CTuningParams *T = GameServer()->Tuning();
-		if(pMe->m_aWeapons[WEAPON_RIFLE].m_Ammo != 0 and ClosestRange < T->m_LaserReach)
+		if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 and ClosestRange < T->m_LaserReach)
 		{
-			Weapon = WEAPON_RIFLE;
+			Weapon = WEAPON_LASER;
 		}
 		else if(pMe->m_aWeapons[WEAPON_SHOTGUN].m_Ammo != 0 and ClosestRange < T->m_ShotgunLifetime*T->m_ShotgunSpeed)
 		{
@@ -328,13 +325,13 @@ void CBot::HandleWeapon(const CCharacterCore *pTarget)
 		m_InputData.m_Fire = (m_LastData.m_Fire) ? 0 : 1;
 
 	// Accuracy
-	float Angle = GetAngle(m_Target) + (rand()%64-32)*pi / 1024.0f;
-	m_Target = GetDir(Angle)*length(m_Target);
+	float Angle = angle(m_Target) + (rand()%64-32)*pi / 1024.0f;
+	m_Target = direction(Angle)*length(m_Target);
 }
 
 void CBot::UpdateEdge(bool Reset)
 {
-	vec2 Pos = m_pPlayer->GetCharacter()->m_Pos;
+	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 	int x = round(Pos.x/32);
 	int y = round(Pos.y/32);
 
@@ -360,7 +357,7 @@ void CBot::UpdateEdge(bool Reset)
 					vec2 VertexPos(m_WalkingEdge.m_pPath[i] % Width, m_WalkingEdge.m_pPath[i] / Width);
 					VertexPos *= 32;
 					VertexPos += vec2(16,16);
-					vec2 W = GetDir(GetAngle(normalize(VertexPos-Pos))+pi/2)*15.f;
+					vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*15.f;
 					if(!(Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) and !(Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
 					{
 						ClosestRange = D;
@@ -402,9 +399,9 @@ void CBot::UpdateEdge(bool Reset)
 			CFlag **apFlags = pController->m_apFlags;
 			if(apFlags[Team^1])
 			{
-				if(apFlags[Team^1]->m_AtStand)
+				if(apFlags[Team^1]->IsAtStand())
 					NewEnd = BotEngine()->GetFlagStandPos(Team^1);
-				if(apFlags[Team^1]->m_pCarryingCharacter == m_pPlayer->GetCharacter())
+				if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter())
 					NewEnd = BotEngine()->GetFlagStandPos(Team);
 			}
 		}
@@ -429,7 +426,7 @@ void CBot::MakeChoice2(bool UseTarget)
 		return;
 	}
 	int Width = BotEngine()->GetWidth();
-	vec2 Pos = m_pPlayer->GetCharacter()->m_Pos;
+	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 
 	if(m_WalkingEdge.m_Size)
 	{
@@ -447,7 +444,7 @@ void CBot::MakeChoice2(bool UseTarget)
 				vec2 VertexPos(m_WalkingEdge.m_pPath[k] % Width, m_WalkingEdge.m_pPath[k] / Width);
 				VertexPos *= 32;
 				VertexPos += vec2(16,16);
-				vec2 W = GetDir(GetAngle(normalize(VertexPos-Pos))+pi/2)*15.f;
+				vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*15.f;
 				if(!(Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) and !(Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
 				{
 					ClosestRange = D;
@@ -552,7 +549,7 @@ void CBot::MakeChoice(bool UseTarget)
 		for(int i = 0 ; i < NumDir; i++)
 		{
 			float a = 2*i*pi / NumDir;
-			vec2 dir = GetDir(a);
+			vec2 dir = direction(a);
 			vec2 Pos = pMe->m_Pos+dir*m_HookLength;
 
 			if((Collision()->IntersectLine(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
