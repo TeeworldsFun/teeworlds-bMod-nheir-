@@ -144,6 +144,7 @@ void CPlayer::Snap(int SnappingClient)
 	if(IsBot())
 		pPlayerInfo->m_Latency = 0;
 
+
 	pPlayerInfo->m_Score = m_Score;
 
 	if(m_ClientID == SnappingClient && (m_Team == TEAM_SPECTATORS || m_DeadSpecMode))

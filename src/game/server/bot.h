@@ -46,6 +46,8 @@ protected:
 
 	int m_TargetClient;
 
+	int m_SnapID;
+
 	enum {
 		BOT_IDLE=0,
 		BOT_FLAG,
@@ -82,6 +84,7 @@ protected:
 	int m_Suicide;
 
 	vec2 m_Target;
+	vec2 m_RealTarget;
 
 	int m_aFlagTiles[2];
 
@@ -116,6 +119,9 @@ public:
 
 	const char *GetName();
 	const char *GetClan() { return g_BotClan; }
+
+	int GetID() { return m_SnapID; }
+	void Snap(int SnappingClient);
 
 	virtual void OnReset();
 

@@ -52,6 +52,7 @@ public:
   int m_End;
   int m_Size;
   int *m_pPath;
+	int *m_pSnapID;
 
   CEdge();
   ~CEdge();
@@ -69,6 +70,8 @@ public:
   int *m_pClosestPath;
   CEdge** m_ppAdjacency;
 
+	int m_Width;
+
   CGraph();
   ~CGraph();
   void Reset();
@@ -77,6 +80,8 @@ public:
   void ComputeClosestPath();
 
   CEdge GetPath(int VStart, int VEnd);
+
+	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 };
 
 class CBotEngine
@@ -92,6 +97,7 @@ protected:
 	CGraph m_Graph;
 
 	int m_aFlagTiles[2];
+	int m_aBotSnapID[MAX_CLIENTS];
 
 public:
 	CBotEngine(class CGameContext *pGameServer);
@@ -104,11 +110,14 @@ public:
   int GetTile(int x, int y);
   int GetTile(int i) { return GetTile(i % m_Width, i / m_Width); };
 
-	CEdge* GetClosestEdge(vec2 Pos, float ClosestRange);
+	int GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge);
+	int FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget);
+	int DistanceToEdge(CEdge Edge, vec2 Pos);
 
   class CGameContext *GameServer() { return m_pGameServer;}
 
 	void Init(class CTile *pTiles, int Width, int Height);
+	void Snap(int SnappingClient);
 	void OnRelease();
 };
 
