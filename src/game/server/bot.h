@@ -110,8 +110,7 @@ protected:
 
 	void CheckState();
 
-	int GetTile(int x, int y) { return BotEngine()->GetTile(x,y);}
-	int GetTile(int i) { return BotEngine()->GetTile(i);}
+	int GetTile(int x, int y) { return BotEngine()->GetTile(x/32,y/32);}
 
 public:
 	CBot(class CBotEngine *m_pBotEngine, CPlayer *pPlayer);

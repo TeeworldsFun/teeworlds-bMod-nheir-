@@ -189,12 +189,16 @@ CBotEngine::CBotEngine(CGameContext *pGameServer)
 {
 	m_pGameServer = pGameServer;
 	m_pGrid = 0;
+	m_Triangulation.m_pTriangles = 0;
+	m_Triangulation.m_Size = 0;
 }
 
 CBotEngine::~CBotEngine()
 {
 	if(m_pGrid)
 		mem_free(m_pGrid);
+	if(m_Triangulation.m_pTriangles)
+		mem_free(m_Triangulation.m_pTriangles);
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
@@ -211,6 +215,9 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 	m_Height = Height;
 
 	if(m_pGrid)	mem_free(m_pGrid);
+	if(m_Triangulation.m_pTriangles) mem_free(m_Triangulation.m_pTriangles);
+	m_Triangulation.m_Size = 0;
+
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
@@ -308,6 +315,9 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 					m_pGrid[i+j*m_Width] |= BTILE_RHOLE;
 			}
 		}
+
+		GenerateTriangle();
+
 		// if(m_Width < 1000)
 		// {
 		// 	char line[1000] = " ";
@@ -468,10 +478,10 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 			{
 				// Q = emptyset
 				// for all points p in P
-				//   if (p is simple for X)
-				//     X = X \ {p}
-				//     for all q in N(p)
-				//        Q = Q + {q}
+				//	 if (p is simple for X)
+				//		 X = X \ {p}
+				//		 for all q in N(p)
+				//				Q = Q + {q}
 				while(size1)
 				{
 					size1--;
@@ -501,8 +511,8 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 				}
 				// P = emptyset
 				// for all points p in Q
-				//   if (p is simple for X)
-				//     P = P+ {p}
+				//	 if (p is simple for X)
+				//		 P = P+ {p}
 				while(size2)
 				{
 					size2--;
@@ -674,12 +684,112 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 	}
 }
 
+void CBotEngine::GenerateTriangle()
+{
+	int CornerCount = 0;
+	for(int i = 1;i < m_Width - 1; i++)
+	{
+		for(int j = 1; j < m_Height - 1; j++)
+		{
+			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+				continue;
+			int n = 0;
+			for(int k = 0; k < 8; k++)
+			{
+				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
+				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
+					n += g_PowerTwo[k];
+			}
+			if(g_IsInnerCorner[n] || g_IsOuterCorner[n])
+				CornerCount++;
+		}
+	}
+	dbg_msg("botengine","Found %d corners", CornerCount);
+	m_Triangulation.m_pTriangles = (CTriangulation::CTriangleData*)mem_alloc(3*CornerCount*sizeof(CTriangulation::CTriangleData),1);
+	vec2 *Corners = (vec2*)mem_alloc((CornerCount+3)*sizeof(vec2),1);
+	int m = 0;
+	for(int i = 1;i < m_Width - 1; i++)
+	{
+		for(int j = 1; j < m_Height - 1; j++)
+		{
+			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+				continue;
+			int n = 0;
+			for(int k = 0; k < 8; k++)
+			{
+				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
+				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
+					n += g_PowerTwo[k];
+			}
+			if(g_IsInnerCorner[n] || g_IsOuterCorner[n])
+				Corners[m++] = vec2(i, j);
+		}
+	}
+	vec2 BL = Corners[0], TR = Corners[0];
+	for(int i = 1; i < CornerCount ; i++)
+	{
+		vec2 c = Corners[i];
+		if(c.x < BL.x) BL.x = c.x;
+		if(c.y < BL.y) BL.y = c.y;
+		if(c.x > TR.x) TR.x = c.x;
+		if(c.y > TR.y) TR.y = c.y;
+	}
+	Corners[CornerCount] = BL;
+	Corners[CornerCount+1].x = 2*TR.x-BL.x;
+	Corners[CornerCount+1].y = BL.y;
+	Corners[CornerCount+2].x = BL.x;
+	Corners[CornerCount+2].y = 2*TR.y-BL.y;
+
+	m_Triangulation.m_Size = 0;
+	for (int i = 0; i < CornerCount - 2; i++)
+	{
+		for (int j = i + 1; j < CornerCount - 1; j++)
+		{
+			for (int k = j + 1; k < CornerCount; k++)
+			{
+				CTriangle triangle(Corners[i], Corners[j], Corners[k]);
+				if(triangle.IsFlat())
+					continue;
+				vec2 cc = triangle.OuterCircleCenter();
+				float radius = distance(Corners[i], cc);
+
+				bool found = false;
+				for (int w = 0; w < CornerCount; w++)
+				{
+					if (w == i || w == j || w == k)
+						continue;
+					if (distance(cc, Corners[w]) < radius)
+					{
+						found = true;
+						break;
+					}
+				}
+
+				if (found)
+					continue;
+
+				vec2 a = triangle.CenterA();
+				vec2 b = triangle.CenterB();
+				vec2 c = triangle.CenterC();
+				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_Triangle = triangle;
+				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_IsAir = !((GetTile(a.x,a.y) & GTILE_MASK) > GTILE_AIR || (GetTile(b.x,b.y) & GTILE_MASK) > GTILE_AIR || (GetTile(c.x,c.y) & GTILE_MASK) > GTILE_AIR);
+				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[0] = GameServer()->Server()->SnapNewID();
+				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[1] = GameServer()->Server()->SnapNewID();
+				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[2] = GameServer()->Server()->SnapNewID();
+				m_Triangulation.m_Size++;
+				dbg_msg("botengine","Found %de triangle with radius %f [(%f, %f) (%f, %f) (%f, %f)]", m_Triangulation.m_Size, radius, triangle.m_aPoints[0].x, triangle.m_aPoints[0].y, triangle.m_aPoints[1].x, triangle.m_aPoints[1].y, triangle.m_aPoints[2].x, triangle.m_aPoints[2].y);
+			}
+		}
+	}
+	dbg_msg("botengine","Build %d triangles", m_Triangulation.m_Size);
+	mem_free(Corners);
+}
+
 int CBotEngine::GetTile(int x, int y)
 {
-	int Nx = clamp(x/32, 0, m_Width-1);
-	int Ny = clamp(y/32, 0, m_Height-1);
-
-	return m_pGrid[Ny*m_Width+Nx];
+	x = clamp(x,0,m_Width-1);
+	y = clamp(y,0,m_Height-1);
+	return m_pGrid[y*m_Width+x];
 }
 
 int CBotEngine::DistanceToEdge(CEdge Edge, vec2 Pos)
@@ -792,7 +902,21 @@ void CBotEngine::Snap(int SnappingClient)
 	if(SnappingClient == -1)
 		return;
 
-	for(int k = 0; k < m_Graph.m_NumEdges; k++)
+	for(int k = 0; k < m_Triangulation.m_Size; k++)
+	{
+		for(int i = 0 ; i < 3; i++)
+		{
+			CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, m_Triangulation.m_pTriangles[k].m_aSnapID[i], sizeof(CNetObj_Laser)));
+			if(!pObj)
+				return;
+			pObj->m_X = m_Triangulation.m_pTriangles[k].m_Triangle.m_aPoints[i].x*32+16;
+			pObj->m_Y = m_Triangulation.m_pTriangles[k].m_Triangle.m_aPoints[i].y*32+16;
+			pObj->m_FromX = m_Triangulation.m_pTriangles[k].m_Triangle.m_aPoints[(i+1)%3].x*32+16;
+			pObj->m_FromY = m_Triangulation.m_pTriangles[k].m_Triangle.m_aPoints[(i+1)%3].y*32+16;
+			pObj->m_StartTick = GameServer()->Server()->Tick();
+		}
+	}
+	for(int k = 0; k < 0 && m_Graph.m_NumEdges; k++)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
 		int Index = pEdge->m_pPath[0];

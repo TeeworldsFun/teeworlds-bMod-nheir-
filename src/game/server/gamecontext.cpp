@@ -455,13 +455,6 @@ void CGameContext::OnTick()
 		if(!m_apPlayers[i] || !m_apPlayers[i]->IsBot())
 			continue;
 		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetLastInputData();
-		if(!g_Config.m_SvBotAllowMove) {
-			Input.m_Direction = 0;
-			Input.m_Hook = 0;
-			Input.m_Jump = 0;
-		}
-		if(!g_Config.m_SvBotAllowHook)
-			Input.m_Hook = 0;
 		m_apPlayers[i]->OnPredictedInput(&Input);
 	}
 
@@ -554,13 +547,6 @@ void CGameContext::OnTick()
 		if(!m_apPlayers[i] || !m_apPlayers[i]->IsBot())
 			continue;
 		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
-		if(!g_Config.m_SvBotAllowMove) {
-			Input.m_Direction = 0;
-			Input.m_Jump = 0;
-			Input.m_Hook = 0;
-		}
-		if(!g_Config.m_SvBotAllowHook)
-			Input.m_Hook = 0;
 		m_apPlayers[i]->OnDirectInput(&Input);
 	}
 #ifdef CONF_DEBUG
@@ -1491,17 +1477,18 @@ void CGameContext::OnSnap(int ClientID)
 	m_World.Snap(ClientID);
 	m_pController->Snap(ClientID);
 	m_Events.Snap(ClientID);
+
+	// Snap bot debug info
 	if(g_Config.m_SvBotEngineDrawGraph)
 		m_pBotEngine->Snap(ClientID);
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		if(m_apPlayers[i] && m_apPlayers[i]->IsBot() && g_Config.m_SvBotDrawTarget)
+			m_apPlayers[i]->m_pBot->Snap(ClientID);
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(m_apPlayers[i])
-		{
 			m_apPlayers[i]->Snap(ClientID);
-			if(m_apPlayers[i]->IsBot() && g_Config.m_SvBotDrawTarget)
-				m_apPlayers[i]->m_pBot->Snap(ClientID);
-		}
 	}
 }
 void CGameContext::OnPreSnap() {}

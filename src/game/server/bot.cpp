@@ -154,7 +154,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 				}
 			}
 		}
-		if(m_State == BOT_FLAG && rand()%2)
+		if(m_State == BOT_FLAG)
 			MakeChoice2(true);
 		else
 			MakeChoice2(false);
@@ -239,6 +239,15 @@ CNetObj_PlayerInput CBot::GetInputData()
 		m_InputData.m_TargetX = m_Target.x;
 		m_InputData.m_TargetY = m_Target.y;
 	}
+
+
+	if(!g_Config.m_SvBotAllowMove) {
+		m_InputData.m_Direction = 0;
+		m_InputData.m_Jump = 0;
+		m_InputData.m_Hook = 0;
+	}
+	if(!g_Config.m_SvBotAllowHook)
+		m_InputData.m_Hook = 0;
 
 	m_LastData = m_InputData;
 	return m_InputData;
@@ -371,7 +380,7 @@ void CBot::UpdateEdge(bool Reset)
 		}
 		else {
 			ClosestRange = distance(Pos, BotEngine()->GetGraph()->ConvertIndex(m_WalkingEdge.m_End));
-			if(ClosestRange < 10. || ((GetTile(m_WalkingEdge.m_End) & GTILE_MASK) >= GTILE_AIR && ClosestRange < 100))
+			if(ClosestRange < 10. || ((BotEngine()->GetTile(m_WalkingEdge.m_End) & GTILE_MASK) >= GTILE_AIR && ClosestRange < 100))
 			NewStart = m_WalkingEdge.m_End;
 		}
 	}
