@@ -1,3 +1,6 @@
 [submodule "datasrc/languages"]
 	path = datasrc/languages
 	url = git://github.com/teeworlds/teeworlds-translation.git
+[submodule "datasrc/maps"]
+	path = datasrc/maps
+	url = git://github.com/teeworlds/teeworlds-maps.git

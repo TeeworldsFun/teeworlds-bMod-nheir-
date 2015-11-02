@@ -155,22 +155,22 @@ class CTriangle {
 						count++;
 				}
 			}
-			return count >= 3;
+			return count >= 1;
 		}
 };
 
 class CVertex {
 public:
-  int m_Index;
+  vec2 m_Pos;
   int m_Degree;
 };
 
 class CEdge {
 public:
-  int m_Start;
-  int m_End;
+  vec2 m_Start;
+  vec2 m_End;
   int m_Size;
-  int *m_pPath;
+  vec2 *m_pPath;
 	int *m_pSnapID;
 
   CEdge();
@@ -198,7 +198,7 @@ public:
 
   void ComputeClosestPath();
 
-  CEdge GetPath(int VStart, int VEnd);
+  CEdge GetPath(vec2 VStart, vec2 VEnd);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 };
@@ -210,6 +210,8 @@ protected:
 
 	class CTile *m_pTiles;
 	int *m_pGrid;
+	vec2 *m_pCorners;
+	int m_CornerCount;
 	int m_Width;
 	int m_Height;
 
@@ -223,7 +225,11 @@ protected:
 		int m_Size;
 	} m_Triangulation;
 
-	void GenerateTriangle();
+	void GenerateCorners();
+	void GenerateTriangles();
+	void GenerateGraphFromTriangles();
+
+	int NetworkClipped(int SnappingClient, vec2 CheckPos);
 
 	int m_aFlagTiles[2];
 	int m_aBotSnapID[MAX_CLIENTS];
@@ -237,7 +243,9 @@ public:
   int GetFlagStandPos(int Team) { return m_aFlagTiles[Team&1]; }
 
   int GetTile(int x, int y);
+	int GetTile(vec2 Pos) { return GetTile(round(Pos.x/32), round(Pos.y/32));}
   int GetTile(int i) { return m_pGrid[i]; };
+	int FastIntersectLine(int Id1, int Id2);
 
 	int GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge);
 	int FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget);

@@ -370,7 +370,7 @@ void CBot::UpdateEdge(bool Reset)
 
 	int Width = BotEngine()->GetWidth();
 
-	int NewStart = -1;
+	bool NewStart = false;
 	int ClosestRange = BotEngine()->DistanceToEdge(m_WalkingEdge,Pos);
 	if(!Reset)
 	{
@@ -379,14 +379,14 @@ void CBot::UpdateEdge(bool Reset)
 			Reset = true;
 		}
 		else {
-			ClosestRange = distance(Pos, BotEngine()->GetGraph()->ConvertIndex(m_WalkingEdge.m_End));
-			if(ClosestRange < 10. || ((BotEngine()->GetTile(m_WalkingEdge.m_End) & GTILE_MASK) >= GTILE_AIR && ClosestRange < 100))
-			NewStart = m_WalkingEdge.m_End;
+			ClosestRange = distance(Pos, m_WalkingEdge.m_End);
+			if(ClosestRange < 14. || ((BotEngine()->GetTile(m_WalkingEdge.m_End) & GTILE_MASK) >= GTILE_AIR && ClosestRange < 100))
+			NewStart = true;
 		}
 	}
 	if(!Reset && m_WalkStart + 60 * SERVER_TICK_SPEED < GameServer()->Server()->Tick())
 		Reset = true;
-	if(NewStart > -1)
+	if(NewStart)
 	{
 		m_WalkStart = GameServer()->Server()->Tick();
 		int NewEnd = -1;
@@ -402,16 +402,17 @@ void CBot::UpdateEdge(bool Reset)
 					NewEnd = BotEngine()->GetFlagStandPos(Team);
 			}
 		}
-
+		vec2 End;
 		if(NewEnd < 0)
 		{
 			int r = rand()%(BotEngine()->GetGraph()->m_NumVertices-1);
-			if(BotEngine()->GetGraph()->m_pVertices[r].m_Index == NewStart)
+			if(BotEngine()->GetGraph()->m_pVertices[r].m_Pos == m_WalkingEdge.m_End)
 				r++;
-			NewEnd = BotEngine()->GetGraph()->m_pVertices[r].m_Index;
+			End = BotEngine()->GetGraph()->m_pVertices[r].m_Pos;
 		}
+		else End = BotEngine()->ConvertIndex(NewEnd);
 		m_WalkingEdge.Reset();
-		m_WalkingEdge = BotEngine()->GetGraph()->GetPath(NewStart, NewEnd);
+		m_WalkingEdge = BotEngine()->GetGraph()->GetPath(m_WalkingEdge.m_End, End);
 	}
 	else if(Reset || !m_WalkingEdge.m_Size)
 	{
@@ -437,7 +438,7 @@ void CBot::MakeChoice2(bool UseTarget)
 		if(dist >= 0)
 		{
 			UseTarget = true;
-			m_RealTarget = (m_pPlayer->GetCID()%2) ? m_Target : BotEngine()->GetGraph()->ConvertIndex(m_WalkingEdge.m_End);
+			m_RealTarget = (m_pPlayer->GetCID()%2) ? m_Target : m_WalkingEdge.m_End;
 			m_Target -= Pos;
 		}
 		else
