@@ -116,7 +116,7 @@ void CBot::UpdateTarget()
 			int Team = m_pPlayer->GetTeam();
 			int Count = 0;
 			for(int c = 0; c < MAX_CLIENTS; c++)
-				if(c != m_pPlayer->GetCID() && GameServer()->m_apPlayers[c] && GameServer()->m_apPlayers[c]->GetCharacter() && GameServer()->m_apPlayers[c]->GetCharacter() && (GameServer()->m_apPlayers[c]->GetTeam() != Team || !GameServer()->m_pController->IsTeamplay()))
+				if(c != m_pPlayer->GetCID() && GameServer()->m_apPlayers[c] && GameServer()->m_apPlayers[c]->GetCharacter() && (GameServer()->m_apPlayers[c]->GetTeam() != Team || !GameServer()->m_pController->IsTeamplay()))
 					Count++;
 
 			if(Count)
@@ -134,7 +134,7 @@ void CBot::UpdateTarget()
 			}
 		}
 		// Random destination
-		int r = random_int()%(BotEngine()->GetGraph()->m_NumVertices-1);
+		int r = random_int()%BotEngine()->GetGraph()->m_NumVertices;
 		m_ComputeTarget.m_Pos = BotEngine()->GetGraph()->m_pVertices[r].m_Pos;
 		m_ComputeTarget.m_Type = CTarget::TARGET_AIR;
 		return;
@@ -192,9 +192,10 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 	MakeChoice2(InSight);
 
-	HandleWeapon(InSight);
+	if(m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
+		HandleWeapon(InSight);
 
-	m_RealTarget = m_Target;
+	m_RealTarget = m_Target+Pos;
 
 	HandleHook(InSight);
 
@@ -465,6 +466,9 @@ void CBot::UpdateEdge()
 		m_WalkingEdge.Reset();
 		m_WalkingEdge = BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos);
 		m_ComputeTarget.m_NeedUpdate = false;
+		dbg_msg("bot", "new path of size=%d", m_WalkingEdge.m_Size);
+		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
+		// 	dbg_msg("bot", "\t(%f, %f)", m_WalkingEdge.m_pPath[i].x, m_WalkingEdge.m_pPath[i].y);
 	}
 }
 
@@ -483,7 +487,6 @@ void CBot::MakeChoice2(bool UseTarget)
 		if(dist >= 0)
 		{
 			UseTarget = true;
-			m_RealTarget = (m_pPlayer->GetCID()%2) ? m_Target : m_WalkingEdge.m_End;
 			m_Target -= Pos;
 		}
 	}
@@ -593,32 +596,32 @@ void CBot::Snap(int SnappingClient)
 		return;
 
 	vec2 Pos = pMe->GetCore()->m_Pos;
-
-	CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, GetID(), sizeof(CNetObj_Laser)));
-	if(!pObj)
-		return;
-
-	pObj->m_X = (int)(m_RealTarget.x);
-	pObj->m_Y = (int)(m_RealTarget.y);
-	pObj->m_FromX = (int)Pos.x;
-	pObj->m_FromY = (int)Pos.y;
-	pObj->m_StartTick = GameServer()->Server()->Tick();
-
-	for(int l = 1 ; l < m_WalkingEdge.m_Size-1 ; l++)
 	{
-		vec2 From = m_WalkingEdge.m_pPath[l-1];
-		vec2 To = m_WalkingEdge.m_pPath[l];
-		if(BotEngine()->NetworkClipped(SnappingClient, To) && BotEngine()->NetworkClipped(SnappingClient, From))
-			continue;
-		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, m_WalkingEdge.m_pSnapID[l], sizeof(CNetObj_Laser)));
+		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, GetID(), sizeof(CNetObj_Laser)));
 		if(!pObj)
 			return;
-		pObj->m_X = (int) To.x;
-		pObj->m_Y = (int) To.y;
-		pObj->m_FromX = (int) From.x;
-		pObj->m_FromY = (int) From.y;
+
+		pObj->m_X = (int)(m_RealTarget.x);
+		pObj->m_Y = (int)(m_RealTarget.y);
+		pObj->m_FromX = (int)Pos.x;
+		pObj->m_FromY = (int)Pos.y;
 		pObj->m_StartTick = GameServer()->Server()->Tick();
 	}
+	// for(int l = 1 ; l < m_WalkingEdge.m_Size-1 ; l++)
+	// {
+	// 	vec2 From = m_WalkingEdge.m_pPath[l-1];
+	// 	vec2 To = m_WalkingEdge.m_pPath[l];
+	// 	if(BotEngine()->NetworkClipped(SnappingClient, To) && BotEngine()->NetworkClipped(SnappingClient, From))
+	// 		continue;
+	// 	CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, m_WalkingEdge.m_pSnapID[l], sizeof(CNetObj_Laser)));
+	// 	if(!pObj)
+	// 		return;
+	// 	pObj->m_X = (int) To.x;
+	// 	pObj->m_Y = (int) To.y;
+	// 	pObj->m_FromX = (int) From.x;
+	// 	pObj->m_FromY = (int) From.y;
+	// 	pObj->m_StartTick = GameServer()->Server()->Tick();
+	// }
 }
 
 const char *CBot::GetName() {

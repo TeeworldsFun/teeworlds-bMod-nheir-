@@ -27,6 +27,7 @@ void CEdge::Free()
 		mem_free(m_pPath);
 	if(m_pSnapID)
 		mem_free(m_pSnapID);
+	m_pSnapID = 0;
 	m_pPath = 0;
 }
 
@@ -71,7 +72,7 @@ void CGraph::Free()
 
 void CGraph::ComputeClosestPath()
 {
-	if(!m_pEdges or !m_pVertices)
+	if(!m_pEdges || !m_pVertices)
 		return;
 	if(m_pClosestPath)
 		mem_free(m_pClosestPath);
@@ -97,10 +98,10 @@ void CGraph::ComputeClosestPath()
 	for(int i=0; i < m_NumEdges ; i++)
 	{
 		int Start, End;
-		for(Start=0; Start < m_NumVertices and m_pVertices[Start].m_Pos != m_pEdges[i].m_Start; Start++);
-		for(End=0; End < m_NumVertices and m_pVertices[End].m_Pos != m_pEdges[i].m_End; End++);
+		for(Start=0; Start < m_NumVertices && m_pVertices[Start].m_Pos != m_pEdges[i].m_Start; Start++);
+		for(End=0; End < m_NumVertices && m_pVertices[End].m_Pos != m_pEdges[i].m_End; End++);
 		if(m_pEdges[i].m_Size < Dist[Start + End * m_NumVertices])
-			Dist[Start + End * m_NumVertices] = m_pEdges[i].m_Size;
+			Dist[Start + End * m_NumVertices] = m_pEdges[i].m_Size-1;
 		m_pClosestPath[Start + End * m_NumVertices] = End;
 		m_ppAdjacency[Start + End * m_NumVertices] = m_pEdges+i;
 	}
@@ -126,9 +127,9 @@ void CGraph::ComputeClosestPath()
 // {
 // 	CEdge Edge;
 // 	int Start, End;
-// 	for(Start=0; Start < m_NumVertices and m_pVertices[Start].m_Index != VStart; Start++);
-// 	for(End=0; End < m_NumVertices and m_pVertices[End].m_Index != VEnd; End++);
-// 	if(Start == m_NumVertices or End == m_NumVertices)
+// 	for(Start=0; Start < m_NumVertices && m_pVertices[Start].m_Index != VStart; Start++);
+// 	for(End=0; End < m_NumVertices && m_pVertices[End].m_Index != VEnd; End++);
+// 	if(Start == m_NumVertices || End == m_NumVertices)
 // 		return Edge;
 // 	int Size = 0;
 // 	int Cur = Start;
@@ -157,17 +158,18 @@ CEdge CGraph::GetPath(vec2 VStart, vec2 VEnd, bool padding)
 {
 	CEdge Edge;
 	int Start, End;
-	for(Start=0; Start < m_NumVertices and m_pVertices[Start].m_Pos != VStart; Start++);
-	for(End=0; End < m_NumVertices and m_pVertices[End].m_Pos != VEnd; End++);
-	if(Start == m_NumVertices or End == m_NumVertices)
+	for(Start=0; Start < m_NumVertices && m_pVertices[Start].m_Pos != VStart; Start++);
+	for(End=0; End < m_NumVertices && m_pVertices[End].m_Pos != VEnd; End++);
+	if(Start == m_NumVertices || End == m_NumVertices || m_pClosestPath[Start + End * m_NumVertices] < 0)
 		return Edge;
 	int Size = (padding) ? 2 : 0;
 	int Cur = Start;
 	while(Cur != End)
 	{
-		Size += m_ppAdjacency[Cur + m_pClosestPath[Cur + End * m_NumVertices]*m_NumVertices]->m_Size;
+		Size++;
 		Cur = m_pClosestPath[Cur + End * m_NumVertices];
 	}
+	Size++;
 	Edge.m_Start = VStart;
 	Edge.m_End = VEnd;
 	Edge.m_Size = Size;
@@ -179,13 +181,13 @@ CEdge CGraph::GetPath(vec2 VStart, vec2 VEnd, bool padding)
 	while(Cur != End)
 	{
 		int Next = m_pClosestPath[Cur + End * m_NumVertices];
-		for(int j = 0; j < m_ppAdjacency[Cur + Next*m_NumVertices]->m_Size ; j++)
-		{
-			Edge.m_pPath[i] = m_ppAdjacency[Cur + Next*m_NumVertices]->m_pPath[j];
-			Edge.m_pSnapID[i++] = m_ppAdjacency[Cur + Next*m_NumVertices]->m_pSnapID[j];
-		}
+		Edge.m_pPath[i] = m_ppAdjacency[Cur + Next*m_NumVertices]->m_pPath[0];
+		Edge.m_pSnapID[i++] = m_ppAdjacency[Cur + Next*m_NumVertices]->m_pSnapID[0];
+		if(Next == End)
+			Edge.m_pSnapID[i] = m_ppAdjacency[Cur + Next*m_NumVertices]->m_pSnapID[1];
 		Cur = Next;
 	}
+	Edge.m_pPath[i] = VEnd;
 
 	return Edge;
 }
@@ -211,7 +213,7 @@ CBotEngine::~CBotEngine()
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
-		for(int l = 1 ; l < pEdge->m_Size ; l++)
+		for(int l = 0 ; l < pEdge->m_Size ; l++)
 			GameServer()->Server()->SnapFreeID(pEdge->m_pSnapID[l]);
 	}
 }
@@ -232,7 +234,7 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
-		for(int l = 1 ; l < pEdge->m_Size ; l++)
+		for(int l = 0 ; l < pEdge->m_Size ; l++)
 			GameServer()->Server()->SnapFreeID(pEdge->m_pSnapID[l]);
 	}
 	m_Graph.Free();
@@ -253,14 +255,14 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 			{
 				m_pGrid[i+j*m_Width] = Index + GTILE_AIR - TILE_AIR;
 			}
-			if(Index >= ENTITY_OFFSET + ENTITY_FLAGSTAND_RED and Index < ENTITY_OFFSET + NUM_ENTITIES)
+			if(Index >= ENTITY_OFFSET + ENTITY_FLAGSTAND_RED && Index < ENTITY_OFFSET + NUM_ENTITIES)
 			{
 				m_pGrid[i+j*m_Width] = Index + GTILE_FLAGSTAND_RED - ENTITY_FLAGSTAND_RED - ENTITY_OFFSET;
 				if(m_pGrid[i+j*m_Width] <= GTILE_FLAGSTAND_BLUE)
 					m_aFlagStandPos[m_pGrid[i+j*m_Width]] = vec2(i,j)*32+vec2(16,16);
 			}
 
-			if(m_pGrid[i+j*m_Width] == GTILE_SOLID or m_pGrid[i+j*m_Width] == GTILE_NOHOOK)
+			if(m_pGrid[i+j*m_Width] == GTILE_SOLID || m_pGrid[i+j*m_Width] == GTILE_NOHOOK)
 				m_pGrid[i+j*m_Width] |= BTILE_SAFE;
 			else
 				m_pGrid[i+j*m_Width] |= BTILE_HOLE;
@@ -289,7 +291,7 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 				{
 					m_pGrid[i+j*m_Width] = Index + GTILE_AIR - TILE_AIR;
 				}
-				else if(Index >= ENTITY_OFFSET + ENTITY_FLAGSTAND_RED and Index < ENTITY_OFFSET + NUM_ENTITIES)
+				else if(Index >= ENTITY_OFFSET + ENTITY_FLAGSTAND_RED && Index < ENTITY_OFFSET + NUM_ENTITIES)
 				{
 					m_pGrid[i+j*m_Width] = Index + GTILE_FLAGSTAND_RED - ENTITY_FLAGSTAND_RED - ENTITY_OFFSET;
 					if(m_pGrid[i+j*m_Width] <= GTILE_FLAGSTAND_BLUE)
@@ -300,16 +302,16 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 					m_pGrid[i+j*m_Width] = GTILE_AIR;
 				}
 
-				if(m_pGrid[i+j*m_Width] == GTILE_SOLID or m_pGrid[i+j*m_Width] == GTILE_NOHOOK)
+				if(m_pGrid[i+j*m_Width] == GTILE_SOLID || m_pGrid[i+j*m_Width] == GTILE_NOHOOK)
 					m_pGrid[i+j*m_Width] |= BTILE_SAFE;
 				else if(m_pGrid[i+j*m_Width] == GTILE_DEATH)
 					m_pGrid[i+j*m_Width] |= BTILE_HOLE;
 				else
 				{
-					bool Left = i > 0 and m_pGrid[i-1+(j+1)*m_Width] & BTILE_SAFE and !(m_pGrid[i+(j+1)*m_Width] & BTILE_RHOLE) and (m_pGrid[i-1+(j+1)*m_Width]&GTILE_MASK) <= GTILE_AIR;
-					bool Right = i < m_Width - 1 and m_pGrid[i+1+(j+1)*m_Width] & BTILE_SAFE and !(m_pGrid[i+(j+1)*m_Width] & BTILE_LHOLE) and (m_pGrid[i+1+(j+1)*m_Width]&GTILE_MASK) <= GTILE_AIR;
+					bool Left = i > 0 && m_pGrid[i-1+(j+1)*m_Width] & BTILE_SAFE && !(m_pGrid[i+(j+1)*m_Width] & BTILE_RHOLE) && (m_pGrid[i-1+(j+1)*m_Width]&GTILE_MASK) <= GTILE_AIR;
+					bool Right = i < m_Width - 1 && m_pGrid[i+1+(j+1)*m_Width] & BTILE_SAFE && !(m_pGrid[i+(j+1)*m_Width] & BTILE_LHOLE) && (m_pGrid[i+1+(j+1)*m_Width]&GTILE_MASK) <= GTILE_AIR;
 
-					if(Left or Right or m_pGrid[i+(j+1)*m_Width] & BTILE_SAFE)
+					if(Left || Right || m_pGrid[i+(j+1)*m_Width] & BTILE_SAFE)
 						m_pGrid[i+j*m_Width] |= BTILE_SAFE;
 					else
 						m_pGrid[i+j*m_Width] |= BTILE_HOLE;
@@ -657,8 +659,8 @@ CEdge CBotEngine::GetPath(vec2 VStart, vec2 VEnd)
 	CEdge e = m_Graph.GetPath(GetClosestVertex(VStart),GetClosestVertex(VEnd),true);
 	if(e.m_Size < 2)
 		return e;
-	e.m_pPath[0] = VStart;
-	e.m_pPath[e.m_Size-1] = VEnd;
+	e.m_pPath[0] = e.m_Start = VStart;
+	e.m_pPath[e.m_Size-1] = e.m_End = VEnd;
 	return e;
 }
 
@@ -683,8 +685,6 @@ int CBotEngine::DistanceToEdge(CEdge Edge, vec2 Pos)
 
 int CBotEngine::FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget)
 {
-	int x = round_to_int(Pos.x/32);
-	int y = round_to_int(Pos.y/32);
 	for(int k = Edge.m_Size-1 ; k >=0 ; k--)
 	{
 		int D = distance(Pos, Edge.m_pPath[k]);
@@ -692,7 +692,7 @@ int CBotEngine::FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget)
 		{
 			vec2 VertexPos = Edge.m_pPath[k];
 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;
-			if(!(GameServer()->Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) and !(GameServer()->Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
+			if(!(GameServer()->Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) && !(GameServer()->Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
 			{
 				if(pTarget)
 					*pTarget = VertexPos;
@@ -794,20 +794,17 @@ void CBotEngine::Snap(int SnappingClient)
 	{
 		CEdge *pEdge = m_Graph.m_pEdges + k;
 
-		for(int l = 1 ; l < pEdge->m_Size ; l++)
-		{
-			vec2 From = pEdge->m_pPath[l-1];
-			vec2 To = pEdge->m_pPath[l];
-			if(NetworkClipped(SnappingClient, To) && NetworkClipped(SnappingClient, From))
-				continue;
-			CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, pEdge->m_pSnapID[l], sizeof(CNetObj_Laser)));
-			if(!pObj)
-				return;
-			pObj->m_X = (int) To.x;
-			pObj->m_Y = (int) To.y;
-			pObj->m_FromX = (int) From.x;
-			pObj->m_FromY = (int) From.y;
-			pObj->m_StartTick = GameServer()->Server()->Tick();
-		}
+		vec2 From = pEdge->m_Start;
+		vec2 To = pEdge->m_End;
+		if(NetworkClipped(SnappingClient, To) && NetworkClipped(SnappingClient, From))
+			continue;
+		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, pEdge->m_pSnapID[0], sizeof(CNetObj_Laser)));
+		if(!pObj)
+			return;
+		pObj->m_X = (int) To.x;
+		pObj->m_Y = (int) To.y;
+		pObj->m_FromX = (int) From.x;
+		pObj->m_FromY = (int) From.y;
+		pObj->m_StartTick = GameServer()->Server()->Tick();
 	}
 }
