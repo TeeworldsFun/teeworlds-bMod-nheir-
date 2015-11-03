@@ -358,7 +358,7 @@ void CBot::HandleWeapon(const CCharacterCore *pTarget)
 		m_Target = Target;
 
 	// Accuracy
-	// float Angle = angle(m_Target) + (rand()%64-32)*pi / 1024.0f;
+	// float Angle = angle(m_Target) + (random_int()%64-32)*pi / 1024.0f;
 	// m_Target = direction(Angle)*length(m_Target);
 }
 
@@ -405,7 +405,7 @@ void CBot::UpdateEdge(bool Reset)
 		vec2 End;
 		if(NewEnd < 0)
 		{
-			int r = rand()%(BotEngine()->GetGraph()->m_NumVertices-1);
+			int r = random_int()%(BotEngine()->GetGraph()->m_NumVertices-1);
 			if(BotEngine()->GetGraph()->m_pVertices[r].m_Pos == m_WalkingEdge.m_End)
 				r++;
 			End = BotEngine()->GetGraph()->m_pVertices[r].m_Pos;
@@ -462,7 +462,7 @@ void CBot::MakeChoice(bool UseTarget)
 	bool Grounded = IsGrounded();
 
 	if(TempChar.m_Input.m_Direction == 0)
-		TempChar.m_Input.m_Direction = (rand()%2)*2-1;
+		TempChar.m_Input.m_Direction = (random_int()%2)*2-1;
 	if(UseTarget)
 		TempChar.m_Input.m_Direction = (m_Target.x > 28.f) ? 1 : (m_Target.x < -28.f) ? -1:0;
 	CWorldCore TempWorld;
@@ -532,7 +532,7 @@ void CBot::MakeChoice(bool UseTarget)
 	if(pMe->m_HookState == HOOK_FLYING)
 		Flags |= BFLAG_HOOK;
 	// do random hook
-	if(!m_Fire && m_InputData.m_Hook == 0 && pMe->m_HookState == HOOK_IDLE && (rand()%10 == 0 || (CurTile & BTILE_HOLE && rand()%4 == 0)))
+	if(!m_Fire && m_InputData.m_Hook == 0 && pMe->m_HookState == HOOK_IDLE && (random_int()%10 == 0 || (CurTile & BTILE_HOLE && random_int()%4 == 0)))
 	{
 		int NumDir = BOT_HOOK_DIRS;
 		vec2 HookDir(0.0f,0.0f);
