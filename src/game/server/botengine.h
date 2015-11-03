@@ -198,7 +198,7 @@ public:
 
   void ComputeClosestPath();
 
-  CEdge GetPath(vec2 VStart, vec2 VEnd);
+  CEdge GetPath(vec2 VStart, vec2 VEnd, bool padding = false);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 };
@@ -229,9 +229,7 @@ protected:
 	void GenerateTriangles();
 	void GenerateGraphFromTriangles();
 
-	int NetworkClipped(int SnappingClient, vec2 CheckPos);
-
-	int m_aFlagTiles[2];
+	vec2 m_aFlagStandPos[2];
 	int m_aBotSnapID[MAX_CLIENTS];
 
 public:
@@ -240,24 +238,29 @@ public:
 
   int GetWidth() { return m_Width; }
   CGraph *GetGraph() { return &m_Graph; }
-  int GetFlagStandPos(int Team) { return m_aFlagTiles[Team&1]; }
+  vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
+	CEdge GetPath(vec2 VStart, vec2 VEnd);
 
   int GetTile(int x, int y);
-	int GetTile(vec2 Pos) { return GetTile(round(Pos.x/32), round(Pos.y/32));}
+	int GetTile(vec2 Pos);
   int GetTile(int i) { return m_pGrid[i]; };
 	int FastIntersectLine(int Id1, int Id2);
 
 	int GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge);
+	vec2 GetClosestVertex(vec2 Pos);
 	int FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget);
 	int DistanceToEdge(CEdge Edge, vec2 Pos);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
+	int ConvertFromIndex(vec2 Pos);
 
   class CGameContext *GameServer() { return m_pGameServer;}
 
 	void Init(class CTile *pTiles, int Width, int Height);
 	void Snap(int SnappingClient);
 	void OnRelease();
+
+	int NetworkClipped(int SnappingClient, vec2 CheckPos);
 };
 
 #endif

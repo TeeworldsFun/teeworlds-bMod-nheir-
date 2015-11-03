@@ -85,6 +85,23 @@ protected:
 
 	vec2 m_Target;
 	vec2 m_RealTarget;
+	struct CTarget {
+		vec2 m_Pos;
+		enum {
+			TARGET_EMPTY=-1,
+			TARGET_PLAYER=0,
+			TARGET_FLAG,
+			TARGET_ARMOR,
+			TARGET_HEALTH,
+			TARGET_WEAPON_SHOTGUN,
+			TARGET_WEAPON_GRENADE,
+			TARGET_POWERUP_NINJA,
+			TARGET_WEAPON_RIFLE,
+			TARGET_AIR
+		} m_Type;
+		int m_PlayerCID;
+		bool m_NeedUpdate;
+	} m_ComputeTarget;
 
 	int m_aFlagTiles[2];
 
@@ -98,13 +115,15 @@ protected:
 	CNetObj_PlayerInput m_LastData;
 
 	int GetTarget();
+	void UpdateTarget();
 	int GetTeam(int ClientID);
 	int IsFalling();
 	bool IsGrounded();
 
-	void HandleWeapon(const CCharacterCore *pTarget);
-	void UpdateEdge(bool Reset);
-	void MakeChoice(bool UseTarget);
+	void HandleWeapon(bool SeeTarget);
+	void HandleHook(bool SeeTarget);
+	void UpdateEdge();
+	void MakeChoice();
 	void MakeChoice2(bool UseTarget);
 	int Predict(class CCharacterCore *pMe, bool Input=false);
 
