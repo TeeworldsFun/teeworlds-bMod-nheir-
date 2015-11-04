@@ -165,18 +165,11 @@ public:
   int m_Degree;
 };
 
-class CEdge {
-public:
+struct CEdge {
   vec2 m_Start;
   vec2 m_End;
   int m_Size;
-  vec2 *m_pPath;
-	int *m_pSnapID;
-
-  CEdge();
-  ~CEdge();
-  void Reset();
-  void Free();
+	int m_SnapID;
 };
 
 class CGraph {
@@ -187,7 +180,8 @@ public:
   int m_NumVertices;
 
   int *m_pClosestPath;
-  CEdge** m_ppAdjacency;
+
+	int m_Diameter;
 
 	int m_Width;
 
@@ -198,7 +192,7 @@ public:
 
   void ComputeClosestPath();
 
-  CEdge GetPath(vec2 VStart, vec2 VEnd, bool padding = false);
+  int GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 };
@@ -236,10 +230,15 @@ public:
 	CBotEngine(class CGameContext *pGameServer);
 	~CBotEngine();
 
+	struct CPath {
+		vec2 *m_pVertices;
+		int m_Size;
+	} m_aPaths[MAX_CLIENTS];
+
   int GetWidth() { return m_Width; }
   CGraph *GetGraph() { return &m_Graph; }
   vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
-	CEdge GetPath(vec2 VStart, vec2 VEnd);
+	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath);
 
   int GetTile(int x, int y);
 	int GetTile(vec2 Pos);
@@ -248,7 +247,7 @@ public:
 
 	int GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge);
 	vec2 GetClosestVertex(vec2 Pos);
-	int FarestPointOnEdge(CEdge Edge, vec2 Pos, vec2 *pTarget);
+	int FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget);
 	int DistanceToEdge(CEdge Edge, vec2 Pos);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }

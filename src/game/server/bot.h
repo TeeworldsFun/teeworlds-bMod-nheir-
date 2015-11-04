@@ -46,6 +46,8 @@ protected:
 
 	int m_TargetClient;
 
+	CBotEngine::CPath *m_pPath;
+
 	int m_SnapID;
 
 	enum {

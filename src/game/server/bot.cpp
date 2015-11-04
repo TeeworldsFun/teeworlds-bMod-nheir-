@@ -28,11 +28,13 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 
 	m_SnapID = GameServer()->Server()->SnapNewID();
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
+
+	m_pPath = &pBotEngine->m_aPaths[pPlayer->GetCID()];
 }
 
 CBot::~CBot()
 {
-	m_WalkingEdge.Reset();
+	m_pPath->m_Size = 0;
 	GameServer()->Server()->SnapFreeID(m_SnapID);
 }
 
@@ -42,7 +44,7 @@ void CBot::OnReset()
 	m_AmmoCount[WEAPON_HAMMER] = -1;
 	m_Weapon = WEAPON_GUN;
 	m_Flags = 0;
-	m_WalkingEdge.Reset();
+	m_pPath->m_Size = 0;
 	m_TargetClient = -1;
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
 }
@@ -188,14 +190,15 @@ CNetObj_PlayerInput CBot::GetInputData()
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
 		InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
 		m_Target = pClosest->m_Pos - Pos;
+		m_RealTarget = pClosest->m_Pos;
 	}
 
 	MakeChoice2(InSight);
 
+	m_RealTarget = m_Target+Pos;
+
 	if(m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
 		HandleWeapon(InSight);
-
-	m_RealTarget = m_Target+Pos;
 
 	HandleHook(InSight);
 
@@ -460,13 +463,16 @@ void CBot::UpdateEdge()
 {
 	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY)
+	{
+		dbg_msg("bot", "no edge");
 		return;
+	}
 	if(m_ComputeTarget.m_NeedUpdate)
 	{
-		m_WalkingEdge.Reset();
-		m_WalkingEdge = BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos);
+		m_pPath->m_Size = 0;
+		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
 		m_ComputeTarget.m_NeedUpdate = false;
-		dbg_msg("bot", "new path of size=%d", m_WalkingEdge.m_Size);
+		dbg_msg("bot", "new path of size=%d", m_pPath->m_Size);
 		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
 		// 	dbg_msg("bot", "\t(%f, %f)", m_WalkingEdge.m_pPath[i].x, m_WalkingEdge.m_pPath[i].y);
 	}
@@ -481,9 +487,9 @@ void CBot::MakeChoice2(bool UseTarget)
 	}
 	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 
-	if(m_WalkingEdge.m_Size)
+	if(m_pPath->m_Size)
 	{
-		int dist = BotEngine()->FarestPointOnEdge(m_WalkingEdge, Pos, &m_Target);
+		int dist = BotEngine()->FarestPointOnEdge(m_pPath, Pos, &m_Target);
 		if(dist >= 0)
 		{
 			UseTarget = true;
