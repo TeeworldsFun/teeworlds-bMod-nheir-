@@ -195,7 +195,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 	MakeChoice2(InSight);
 
-	m_RealTarget = m_Target+Pos;
+	m_RealTarget = m_Target + Pos;
 
 	if(m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
 		HandleWeapon(InSight);
@@ -214,8 +214,8 @@ CNetObj_PlayerInput CBot::GetInputData()
 	// if(InSight && diffPos.y < - Close && diffVel.y < 0)
 	// 	m_InputData.m_Jump = 1;
 
-	m_InputData.m_TargetX = m_ComputeTarget.m_Pos.x;
-	m_InputData.m_TargetX = m_ComputeTarget.m_Pos.y;
+	m_InputData.m_TargetX = m_LastData.m_TargetX;
+	m_InputData.m_TargetX = m_LastData.m_TargetY;
 	if(m_InputData.m_Hook || m_InputData.m_Fire) {
 		m_InputData.m_TargetX = m_Target.x;
 		m_InputData.m_TargetY = m_Target.y;
@@ -344,114 +344,132 @@ void CBot::HandleWeapon(bool SeeTarget)
 	vec2 Pos = pMe->GetCore()->m_Pos;
 	vec2 Vel = pMe->GetCore()->m_Vel;
 
+	CCharacterCore* apTarget[MAX_CLIENTS];
+	int Count = 0;
+
 	for(int c = 0 ; c < MAX_CLIENTS ; c++)
 	{
-		if(SeeTarget && c != m_ComputeTarget.m_PlayerCID)
-			continue;
 		if(c == m_pPlayer->GetCID())
-		 	continue;
-		if(!GameServer()->m_apPlayers[c] || !GameServer()->m_apPlayers[c]->GetCharacter() || (GameServer()->m_apPlayers[c]->GetTeam() == Team && GameServer()->m_pController->IsTeamplay()))
 			continue;
-		CCharacterCore* pTarget = GameServer()->m_apPlayers[c]->GetCharacter()->GetCore();
-
-		float ClosestRange = distance(Pos, pTarget->m_Pos);
+		if(SeeTarget && c == m_ComputeTarget.m_PlayerCID)
+		{
+			apTarget[Count++] = apTarget[0];
+			apTarget[0] =	GameServer()->m_apPlayers[c]->GetCharacter()->GetCore();
+		}
+		else if(GameServer()->m_apPlayers[c] && GameServer()->m_apPlayers[c]->GetCharacter() && (GameServer()->m_apPlayers[c]->GetTeam() != Team || !GameServer()->m_pController->IsTeamplay()))
+			apTarget[Count++] = GameServer()->m_apPlayers[c]->GetCharacter()->GetCore();
+	}
+	int Weapon = -1;
+	vec2 Target;
+	for(int c = 0; c < Count; c++)
+	{
+		float ClosestRange = distance(Pos, apTarget[c]->m_Pos);
 		float Close = 65.0f;
-		vec2 Target = pTarget->m_Pos - Pos;
-
-		int Weapon = -1;
-
+		Target = apTarget[c]->m_Pos - Pos;
 		if(ClosestRange < Close)
 		{
 			Weapon = WEAPON_HAMMER;
 		}
-		else if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectLine(Pos, pTarget->m_Pos, 0, 0))
+		else if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectLine(Pos, apTarget[c]->m_Pos, 0, 0))
 	  {
 	    Weapon = WEAPON_LASER;
 	  }
-		else
+	}
+	if(Weapon < 0)
+	{
+		int GoodDir = -1;
+
+		vec2 aProjectilePos[BOT_HOOK_DIRS];
+
+		for(int i = 0 ; i < BOT_HOOK_DIRS ; i++) {
+			vec2 dir = direction(2*i*pi / BOT_HOOK_DIRS);
+			aProjectilePos[i] = Pos + dir*28.*0.75;
+		}
+		int Weapons[] = {WEAPON_GRENADE, WEAPON_SHOTGUN, WEAPON_GUN};
+		for(int j = 0 ; j < 3 ; j++)
 		{
-			int GoodDir = -1;
-
-			vec2 aProjectilePos[BOT_HOOK_DIRS];
-
-			for(int i = 0 ; i < BOT_HOOK_DIRS ; i++) {
-				vec2 dir = direction(2*i*pi / BOT_HOOK_DIRS);
-				aProjectilePos[i] = Pos + dir*28.*0.75;
-			}
-			int Weapons[] = {WEAPON_GRENADE, WEAPON_SHOTGUN, WEAPON_GUN};
-			for(int j = 0 ; j < 3 ; j++)
+			if(!pMe->m_aWeapons[Weapons[j]].m_Ammo)
+				continue;
+			float Curvature, Speed, DTime;
+			switch(Weapons[j])
 			{
-				if(!pMe->m_aWeapons[Weapons[j]].m_Ammo)
-					continue;
-				float Curvature, Speed, DTime;
-				switch(Weapons[j])
-				{
-					case WEAPON_GRENADE:
-						Curvature = GameServer()->Tuning()->m_GrenadeCurvature;
-						Speed = GameServer()->Tuning()->m_GrenadeSpeed;
-						DTime = GameServer()->Tuning()->m_GrenadeLifetime / 10.;
-						break;
-
-					case WEAPON_SHOTGUN:
-						Curvature = GameServer()->Tuning()->m_ShotgunCurvature;
-						Speed = GameServer()->Tuning()->m_ShotgunSpeed;
-						DTime = GameServer()->Tuning()->m_ShotgunLifetime / 10.;
-						break;
-
-					case WEAPON_GUN:
-						Curvature = GameServer()->Tuning()->m_GunCurvature;
-						Speed = GameServer()->Tuning()->m_GunSpeed;
-						DTime = GameServer()->Tuning()->m_GunLifetime / 10.;
-						break;
-				}
-
-				int DTick = (int) (DTime*GameServer()->Server()->TickSpeed());
-				DTime *= Speed;
-
-				vec2 TargetPos = pTarget->m_Pos;
-				vec2 TargetVel = pTarget->m_Vel*DTick;
-
-				int aIsDead[BOT_HOOK_DIRS] = {0};
-
-				for(int k = 0; k < 10 && GoodDir == -1; k++) {
-					for(int i = 0; i < BOT_HOOK_DIRS; i++) {
-						if(aIsDead[i])
-							continue;
-						vec2 dir = direction(2*i*pi / BOT_HOOK_DIRS);
-						vec2 NextPos = aProjectilePos[i];
-						NextPos.x += dir.x*DTime;
-						NextPos.y += dir.y*DTime + Curvature/10000*(DTime*DTime)*(2*k+1);
-						aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
-						vec2 InterPos = closest_point_on_line(aProjectilePos[i],NextPos, TargetPos);
-						if(distance(TargetPos, InterPos)< 28) {
-							GoodDir = i;
-						}
-						aProjectilePos[i] = NextPos;
-					}
-					Collision()->IntersectLine(TargetPos, TargetPos+TargetVel, 0, &TargetPos);
-					TargetVel.y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
-				}
-				if(GoodDir != -1)
-				{
-					Target = direction(2*GoodDir*pi / BOT_HOOK_DIRS)*50;
-					Weapon = Weapons[j];
+				case WEAPON_GRENADE:
+					Curvature = GameServer()->Tuning()->m_GrenadeCurvature;
+					Speed = GameServer()->Tuning()->m_GrenadeSpeed;
+					DTime = GameServer()->Tuning()->m_GrenadeLifetime / 10.;
 					break;
+
+				case WEAPON_SHOTGUN:
+					Curvature = GameServer()->Tuning()->m_ShotgunCurvature;
+					Speed = GameServer()->Tuning()->m_ShotgunSpeed;
+					DTime = GameServer()->Tuning()->m_ShotgunLifetime / 10.;
+					break;
+
+				case WEAPON_GUN:
+					Curvature = GameServer()->Tuning()->m_GunCurvature;
+					Speed = GameServer()->Tuning()->m_GunSpeed;
+					DTime = GameServer()->Tuning()->m_GunLifetime / 10.;
+					break;
+			}
+
+			int DTick = (int) (DTime*GameServer()->Server()->TickSpeed());
+			DTime *= Speed;
+
+			vec2 aTargetPos[MAX_CLIENTS];
+			vec2 aTargetVel[MAX_CLIENTS];
+
+			for(int c = 0; c < Count; c++)
+			{
+				aTargetPos[c] = apTarget[c]->m_Pos;
+				aTargetVel[c] = apTarget[c]->m_Vel;
+			}
+
+			int aIsDead[BOT_HOOK_DIRS] = {0};
+
+			for(int k = 0; k < 10 && GoodDir == -1; k++) {
+				for(int i = 0; i < BOT_HOOK_DIRS; i++) {
+					if(aIsDead[i])
+						continue;
+					vec2 dir = direction(2*i*pi / BOT_HOOK_DIRS);
+					vec2 NextPos = aProjectilePos[i];
+					NextPos.x += dir.x*DTime;
+					NextPos.y += dir.y*DTime + Curvature/10000*(DTime*DTime)*(2*k+1);
+					aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
+					for(int c = 0; c < Count; c++)
+					{
+						vec2 InterPos = closest_point_on_line(aProjectilePos[i],NextPos, aTargetPos[c]);
+						if(distance(aTargetPos[c], InterPos)< 28) {
+							GoodDir = i;
+							break;
+						}
+					}
+					aProjectilePos[i] = NextPos;
+				}
+				for(int c = 0; c < Count; c++)
+				{
+					Collision()->IntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
+					aTargetVel[c].y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
 				}
 			}
-		}
-		if(Weapon > -1)
-		{
-			if(m_LastData.m_WantedWeapon != Weapon+1)
+			if(GoodDir != -1)
 			{
-				m_InputData.m_WantedWeapon = Weapon+1;
-				m_InputData.m_Fire = 0;
+				Target = direction(2*GoodDir*pi / BOT_HOOK_DIRS)*50;
+				Weapon = Weapons[j];
+				break;
 			}
-			else
-				m_InputData.m_Fire = m_LastData.m_Fire^1;
-			if(m_InputData.m_Fire)
-				m_Target = Target;
-			break;
 		}
+	}
+	if(Weapon > -1)
+	{
+		if(m_LastData.m_WantedWeapon != Weapon+1)
+		{
+			m_InputData.m_WantedWeapon = Weapon+1;
+			m_InputData.m_Fire = 0;
+		}
+		else
+			m_InputData.m_Fire = m_LastData.m_Fire^1;
+		if(m_InputData.m_Fire)
+			m_Target = Target;
 	}
 
 	// Accuracy
@@ -467,10 +485,15 @@ void CBot::UpdateEdge()
 		dbg_msg("bot", "no edge");
 		return;
 	}
+	if(m_pPath->m_Size)
+	{
+		if(distance(m_pPath->m_pVertices[m_pPath->m_Size-1], Pos) < 60)
+			m_ComputeTarget.m_NeedUpdate = true;
+	}
 	if(m_ComputeTarget.m_NeedUpdate)
 	{
 		m_pPath->m_Size = 0;
-		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
+		m_pPath->m_Size = BotEngine()->GetPartialPath(Pos, m_ComputeTarget.m_Pos, m_pPath->m_pVertices, 10);
 		m_ComputeTarget.m_NeedUpdate = false;
 		dbg_msg("bot", "new path of size=%d", m_pPath->m_Size);
 		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
@@ -495,6 +518,13 @@ void CBot::MakeChoice2(bool UseTarget)
 			UseTarget = true;
 			m_Target -= Pos;
 		}
+		else
+			m_Target = BotEngine()->NextPoint(Pos,m_ComputeTarget.m_Pos) - Pos;
+
+		// else
+		// {
+		// 	dbg_msg("bot","edge not in sight");
+		// }
 	}
 	MakeChoice();
 }
@@ -613,21 +643,21 @@ void CBot::Snap(int SnappingClient)
 		pObj->m_FromY = (int)Pos.y;
 		pObj->m_StartTick = GameServer()->Server()->Tick();
 	}
-	// for(int l = 1 ; l < m_WalkingEdge.m_Size-1 ; l++)
-	// {
-	// 	vec2 From = m_WalkingEdge.m_pPath[l-1];
-	// 	vec2 To = m_WalkingEdge.m_pPath[l];
-	// 	if(BotEngine()->NetworkClipped(SnappingClient, To) && BotEngine()->NetworkClipped(SnappingClient, From))
-	// 		continue;
-	// 	CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, m_WalkingEdge.m_pSnapID[l], sizeof(CNetObj_Laser)));
-	// 	if(!pObj)
-	// 		return;
-	// 	pObj->m_X = (int) To.x;
-	// 	pObj->m_Y = (int) To.y;
-	// 	pObj->m_FromX = (int) From.x;
-	// 	pObj->m_FromY = (int) From.y;
-	// 	pObj->m_StartTick = GameServer()->Server()->Tick();
-	// }
+	for(int l = 0 ; l < m_pPath->m_Size-1 ; l++)
+	{
+		vec2 From = m_pPath->m_pVertices[l];
+		vec2 To = m_pPath->m_pVertices[l+1];
+		if(BotEngine()->NetworkClipped(SnappingClient, To) && BotEngine()->NetworkClipped(SnappingClient, From))
+			continue;
+		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, m_pPath->m_pSnapID[l], sizeof(CNetObj_Laser)));
+		if(!pObj)
+			return;
+		pObj->m_X = (int) To.x;
+		pObj->m_Y = (int) To.y;
+		pObj->m_FromX = (int) From.x;
+		pObj->m_FromY = (int) From.y;
+		pObj->m_StartTick = GameServer()->Server()->Tick();
+	}
 }
 
 const char *CBot::GetName() {

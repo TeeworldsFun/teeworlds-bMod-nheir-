@@ -232,13 +232,18 @@ public:
 
 	struct CPath {
 		vec2 *m_pVertices;
+		int *m_pSnapID;
 		int m_Size;
+		int m_MaxSize;
 	} m_aPaths[MAX_CLIENTS];
 
   int GetWidth() { return m_Width; }
   CGraph *GetGraph() { return &m_Graph; }
   vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
+
 	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath);
+	int GetPartialPath(vec2 VStart, vec2 VEnd, vec2 *pVertices, int MaxSize);
+	vec2 NextPoint(vec2 Pos, vec2 Target);
 
   int GetTile(int x, int y);
 	int GetTile(vec2 Pos);
