@@ -689,7 +689,7 @@ int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 	for(int k = pPath->m_Size-1 ; k >=0 ; k--)
 	{
 		int D = distance(Pos, pPath->m_pVertices[k]);
-		if( D < 1000)
+		if( D < 200)
 		{
 			vec2 VertexPos = pPath->m_pVertices[k];
 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;

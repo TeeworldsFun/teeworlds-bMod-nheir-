@@ -29,7 +29,8 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 	m_SnapID = GameServer()->Server()->SnapNewID();
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
 
-	m_pPath = &pBotEngine->m_aPaths[pPlayer->GetCID()];
+	m_pPath = &(pBotEngine->m_aPaths[pPlayer->GetCID()]);
+	dbg_msg("bot", "add bot on clientid=%d",pPlayer->GetCID());
 }
 
 CBot::~CBot()
@@ -87,7 +88,7 @@ void CBot::UpdateTarget()
 					return;
 				}
 				// Go to base carrying flag
-				if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter())// && (!apFlags[Team] || apFlags[Team]->IsAtStand())
+				if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter() && (!apFlags[Team] || apFlags[Team]->IsAtStand()))
 				{
 					m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team);
 					m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
@@ -113,7 +114,7 @@ void CBot::UpdateTarget()
 				}
 			}
 		}
-		if(random_int()&1)
+		if(random_int()&0)
 		{
 			int Team = m_pPlayer->GetTeam();
 			int Count = 0;
@@ -197,7 +198,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 	m_RealTarget = m_Target + Pos;
 
-	if(m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
+	if(g_Config.m_SvBotAllowFire && m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
 		HandleWeapon(InSight);
 
 	HandleHook(InSight);
@@ -215,7 +216,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 	// 	m_InputData.m_Jump = 1;
 
 	m_InputData.m_TargetX = m_LastData.m_TargetX;
-	m_InputData.m_TargetX = m_LastData.m_TargetY;
+	m_InputData.m_TargetY = m_LastData.m_TargetY;
 	if(m_InputData.m_Hook || m_InputData.m_Fire) {
 		m_InputData.m_TargetX = m_Target.x;
 		m_InputData.m_TargetY = m_Target.y;
@@ -493,9 +494,10 @@ void CBot::UpdateEdge()
 	if(m_ComputeTarget.m_NeedUpdate)
 	{
 		m_pPath->m_Size = 0;
-		m_pPath->m_Size = BotEngine()->GetPartialPath(Pos, m_ComputeTarget.m_Pos, m_pPath->m_pVertices, 10);
+		//m_pPath->m_Size = BotEngine()->GetPartialPath(Pos, m_ComputeTarget.m_Pos, m_pPath->m_pVertices, 10);
+		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
 		m_ComputeTarget.m_NeedUpdate = false;
-		dbg_msg("bot", "new path of size=%d", m_pPath->m_Size);
+		dbg_msg("bot", "new path of size=%d for type=%d cid=%d", m_pPath->m_Size, m_ComputeTarget.m_Type, m_ComputeTarget.m_PlayerCID);
 		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
 		// 	dbg_msg("bot", "\t(%f, %f)", m_WalkingEdge.m_pPath[i].x, m_WalkingEdge.m_pPath[i].y);
 	}
