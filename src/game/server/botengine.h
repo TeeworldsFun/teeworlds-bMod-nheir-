@@ -229,6 +229,8 @@ protected:
 		int m_Size;
 	} m_Triangulation;
 
+	void Free();
+
 	void GenerateCorners();
 	void GenerateSegments();
 	void GenerateTriangles();
@@ -276,6 +278,8 @@ public:
 	void OnRelease();
 
 	int NetworkClipped(int SnappingClient, vec2 CheckPos);
+
+	static int SegmentComp(const void *a, const void *b);
 };
 
 #endif

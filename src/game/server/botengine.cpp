@@ -118,47 +118,38 @@ CBotEngine::CBotEngine(CGameContext *pGameServer)
 	m_Triangulation.m_Size = 0;
 	m_pCorners = 0;
 	m_CornerCount = 0;
+	m_pSegments = 0;
+	m_SegmentCount = 0;
 	mem_zero(m_aPaths,sizeof(m_aPaths));
 }
 
-CBotEngine::~CBotEngine()
+void CBotEngine::Free()
 {
 	if(m_pGrid)
 		mem_free(m_pGrid);
+
+	for (int i = 0; i < m_Triangulation.m_Size; i++)
+		for(int k = 0 ; k < 3; k++)
+			GameServer()->Server()->SnapFreeID(m_Triangulation.m_pTriangles[i].m_aSnapID[k]);
 	if(m_Triangulation.m_pTriangles)
 		mem_free(m_Triangulation.m_pTriangles);
+	m_Triangulation.m_Size = 0;
+	m_Triangulation.m_pTriangles = 0;
+
 	if(m_pCorners)
 		mem_free(m_pCorners);
-	for(int k = 0; k < m_Graph.m_NumEdges; k++)
-	{
-		CEdge *pEdge = m_Graph.m_pEdges + k;
-		GameServer()->Server()->SnapFreeID(pEdge->m_SnapID);
-	}
-	for(int c = 0; c < MAX_CLIENTS; c++)
-	{
-		if(m_aPaths[c].m_pVertices)
-			mem_free(m_aPaths[c].m_pVertices);
-		if(m_aPaths[c].m_pSnapID)
-		{
-			for(int i = 0 ; i < m_aPaths[c].m_MaxSize; i++)
-				GameServer()->Server()->SnapFreeID(m_aPaths[c].m_pSnapID[i]);
-			mem_free(m_aPaths[c].m_pSnapID);
-		}
-	}
-}
-
-void CBotEngine::Init(CTile *pTiles, int Width, int Height)
-{
-	m_pTiles = pTiles;
-
-	m_Width = Width;
-	m_Height = Height;
-
-	if(m_pGrid)	mem_free(m_pGrid);
-	if(m_Triangulation.m_pTriangles) mem_free(m_Triangulation.m_pTriangles);
-	m_Triangulation.m_Size = 0;
-	if(m_pCorners) mem_free(m_pCorners);
 	m_CornerCount = 0;
+	m_pCorners = 0;
+
+	for(int k = 0; k < m_SegmentCount; k++)
+	{
+		CSegment *pSegment = m_pSegments + k;
+		GameServer()->Server()->SnapFreeID(pSegment->m_SnapID);
+	}
+	if(m_pSegments)
+		mem_free(m_pSegments);
+	m_SegmentCount = 0;
+	m_pSegments = 0;
 
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
@@ -179,6 +170,21 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 		}
 	}
 	mem_zero(m_aPaths,sizeof(m_aPaths));
+}
+
+CBotEngine::~CBotEngine()
+{
+	Free();
+}
+
+void CBotEngine::Init(CTile *pTiles, int Width, int Height)
+{
+	m_pTiles = pTiles;
+
+	m_Width = Width;
+	m_Height = Height;
+
+	Free();
 
 	m_pGrid = (int *)mem_alloc(m_Width*m_Height*sizeof(int),1);
 	if(m_pGrid)
@@ -393,9 +399,42 @@ void CBotEngine::GenerateSegments()
 			}
 		}
 	}
-	dbg_msg("botengine","Allocate %d segments, use %d", m_SegmentCount, pSegment-m_pSegments);
-	if(m_SegmentCount < pSegment-m_pSegments)
+	dbg_msg("botengine","Allocate %d segments, use %d", m_SegmentCount, pSegment - m_pSegments);
+	if(m_SegmentCount != pSegment - m_pSegments)
 		exit(1);
+	qsort(m_pSegments,SegmentCount,sizeof(CSegment),SegmentComp);
+	qsort(m_pSegments+SegmentCount,SegmentCount,sizeof(CSegment),SegmentComp);
+}
+
+int CBotEngine::SegmentComp(const void *a, const void *b)
+{
+	CSegment *s0 = (CSegment *)a;
+	CSegment *s1 = (CSegment *)b;
+	if(s0->m_IsVertical && !s1->m_IsVertical)
+		return 1;
+	if(!s0->m_IsVertical && s1->m_IsVertical)
+		return -1;
+	if(s0->m_IsVertical)
+	{
+		if(s0->m_A.x < s1->m_A.x)
+			return -1;
+		if(s0->m_A.x > s1->m_A.x)
+			return 1;
+		if(s0->m_A.y < s1->m_A.y)
+			return -1;
+		if(s0->m_A.y > s1->m_A.y)
+			return 1;
+		return 0;
+	}
+	if(s0->m_A.y < s1->m_A.y)
+		return -1;
+	if(s0->m_A.y > s1->m_A.y)
+		return 1;
+	if(s0->m_A.x < s1->m_A.x)
+		return -1;
+	if(s0->m_A.x > s1->m_A.x)
+		return 1;
+	return 0;
 }
 
 void CBotEngine::GenerateCorners()
