@@ -204,8 +204,18 @@ protected:
 
 	class CTile *m_pTiles;
 	int *m_pGrid;
+
 	vec2 *m_pCorners;
 	int m_CornerCount;
+
+	struct CSegment {
+		bool m_IsVertical;
+		vec2 m_A;
+		vec2 m_B;
+		int m_SnapID;
+	} *m_pSegments;
+	int m_SegmentCount;
+
 	int m_Width;
 	int m_Height;
 
