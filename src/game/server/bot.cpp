@@ -114,7 +114,7 @@ void CBot::UpdateTarget()
 				}
 			}
 		}
-		if(random_int()&0)
+		if(random_int()&1)
 		{
 			int Team = m_pPlayer->GetTeam();
 			int Count = 0;
@@ -189,7 +189,8 @@ CNetObj_PlayerInput CBot::GetInputData()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
 	{
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
-		InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
+		//InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
+		InSight = !BotEngine()->IntersectSegment(Pos, pClosest->m_Pos);
 		m_Target = pClosest->m_Pos - Pos;
 		m_RealTarget = pClosest->m_Pos;
 	}

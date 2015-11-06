@@ -695,6 +695,72 @@ void CBotEngine::GenerateGraphFromTriangles()
 	m_Graph.ComputeClosestPath();
 }
 
+int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
+{
+	// Horizontal
+	float my = min(P1.y, P2.y);
+	float My = max(P1.y, P2.y);
+	int i = 0, j = m_SegmentCount >> 1;
+	while(i+1<j)
+	{
+		int k = (i+j)>>1;
+		if(m_pSegments[k].m_A.y < my)
+			i = k;
+		else
+			j = k;
+	}
+	int d = i;
+	j = m_SegmentCount >> 1;
+	while(i+1<j)
+	{
+		int k = (i+j)>>1;
+		if(m_pSegments[k].m_A.y <= My)
+			i = k;
+		else
+			j = k;
+	}
+	int f = j;
+	for(int k = d; k < j ; k++)
+	{
+		int d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+		int d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+		if(d1*d2 <= 0)
+			return 1;
+	}
+
+	// Vertical
+	float mx = min(P1.x, P2.x);
+	float Mx = max(P1.x, P2.x);
+	i = m_SegmentCount >> 1, j = m_SegmentCount;
+	while(i+1<j)
+	{
+		int k = (i+j)>>1;
+		if(m_pSegments[k].m_A.x < mx)
+			i = k;
+		else
+			j = k;
+	}
+	d = i;
+	j = m_SegmentCount;
+	while(i+1<j)
+	{
+		int k = (i+j)>>1;
+		if(m_pSegments[k].m_A.x <= Mx)
+			i = k;
+		else
+			j = k;
+	}
+	f = j;
+	for(int k = d; k < j ; k++)
+	{
+		int d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+		int d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+		if(d1*d2 <= 0)
+			return 1;
+	}
+	return 0;
+}
+
 int CBotEngine::GetTile(int x, int y)
 {
 	x = clamp(x,0,m_Width-1);

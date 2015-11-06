@@ -267,6 +267,8 @@ void CPlayer::KillCharacter(int Weapon)
 		m_pCharacter->Die(m_ClientID, Weapon);
 		delete m_pCharacter;
 		m_pCharacter = 0;
+		if(IsBot())
+			m_pBot->OnReset();
 	}
 }
 

@@ -262,6 +262,7 @@ public:
 	int GetTile(vec2 Pos);
   int GetTile(int i) { return m_pGrid[i]; };
 	int FastIntersectLine(int Id1, int Id2);
+	int IntersectSegment(vec2 P1, vec2 P2);
 
 	int GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge);
 	vec2 GetClosestVertex(vec2 Pos);
