@@ -220,6 +220,7 @@ protected:
 	} m_Triangulation;
 
 	void GenerateCorners();
+	void GenerateSegments();
 	void GenerateTriangles();
 	void GenerateGraphFromTriangles();
 

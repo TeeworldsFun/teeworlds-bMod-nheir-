@@ -291,6 +291,40 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 	}
 }
 
+void CBotEngine::GenerateSegments()
+{
+	int SegmentCount = 0;
+	// Vertical segments
+	for(int i = 0;i < m_Width; i++)
+	{
+		bool right = false;
+		bool left = false;
+		for(int j = 0; j < m_Height; j++)
+		{
+			if(i < m_Width-1)
+			{
+				if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
+					left = true;
+				else if(left)
+				{
+					SegmentCount++;
+					left = false;
+				}
+			}
+			if(i > 0)
+			{
+				if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i-1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
+					right = true;
+				else if(right)
+				{
+					SegmentCount++;
+					right = false;
+				}
+			}
+		}
+	}
+}
+
 void CBotEngine::GenerateCorners()
 {
 	int CornerCount = 0;
