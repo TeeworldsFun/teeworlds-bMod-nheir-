@@ -30,7 +30,6 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
 
 	m_pPath = &(pBotEngine->m_aPaths[pPlayer->GetCID()]);
-	dbg_msg("bot", "add bot on clientid=%d",pPlayer->GetCID());
 }
 
 CBot::~CBot()

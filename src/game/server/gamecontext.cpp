@@ -1535,12 +1535,17 @@ void CGameContext::TryMoveBot(int ClientID)
 
 void CGameContext::CheckBotNumber() {
 	int BotNumber = 0;
+	int PlayerCount = 0;
 	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
 		if(!m_apPlayers[i])
 			continue;
 		if(m_apPlayers[i]->IsBot())
 			BotNumber++;
+		else
+			PlayerCount++;
 	}
+	if(!PlayerCount)
+		BotNumber += g_Config.m_SvBotSlots;
 	// Remove bot excedent
 	if(BotNumber-g_Config.m_SvBotSlots > 0)	{
 		int FirstBot = 0;
