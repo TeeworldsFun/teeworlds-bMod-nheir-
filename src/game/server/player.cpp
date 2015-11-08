@@ -285,6 +285,9 @@ void CPlayer::Respawn()
 
 	m_DeadSpecMode = false;
 
+	if(IsBot())
+		m_pBot->OnReset();
+
 	if(m_Team != TEAM_SPECTATORS)
 		m_Spawning = true;
 }

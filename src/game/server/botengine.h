@@ -213,6 +213,7 @@ protected:
 		vec2 m_A;
 		vec2 m_B;
 		int m_SnapID;
+		bool m_Intersect;
 	} *m_pSegments;
 	int m_SegmentCount;
 

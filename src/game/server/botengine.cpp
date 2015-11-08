@@ -709,7 +709,7 @@ int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
 		else
 			j = k;
 	}
-	int d = i;
+	int d = j;
 	j = m_SegmentCount >> 1;
 	while(i+1<j)
 	{
@@ -719,12 +719,12 @@ int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
 		else
 			j = k;
 	}
-	int f = j;
-	for(int k = d; k < j ; k++)
+	int f = i+1;
+	for(int k = d; k < f ; k++)
 	{
-		int d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
-		int d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
-		if(d1*d2 <= 0)
+		float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+		float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+		if(d1*d2 < 0)
 			return 1;
 	}
 
@@ -740,7 +740,7 @@ int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
 		else
 			j = k;
 	}
-	d = i;
+	d = j;
 	j = m_SegmentCount;
 	while(i+1<j)
 	{
@@ -750,12 +750,12 @@ int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
 		else
 			j = k;
 	}
-	f = j;
-	for(int k = d; k < j ; k++)
+	f = i+1;
+	for(int k = d; k < f ; k++)
 	{
-		int d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
-		int d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
-		if(d1*d2 <= 0)
+		float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+		float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+		if(d1*d2 < 0)
 			return 1;
 	}
 	return 0;
