@@ -183,6 +183,8 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 	mem_zero(&m_InputData, sizeof(m_InputData));
 
+	m_InputData.m_WantedWeapon = m_LastData.m_WantedWeapon;
+
 	vec2 Pos = pMe->m_Pos;
 
 	bool InSight = false;
@@ -190,7 +192,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 	{
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
 		//InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
-		InSight = !BotEngine()->IntersectSegment(Pos, pClosest->m_Pos);
+		InSight = !BotEngine()->IntersectSegment(Pos, pClosest->m_Pos, 0);
 		m_Target = pClosest->m_Pos - Pos;
 		m_RealTarget = pClosest->m_Pos;
 	}
@@ -416,6 +418,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 			int DTick = (int) (DTime*GameServer()->Server()->TickSpeed());
 			DTime *= Speed;
+			Curvature *= 0.00001f;
 
 			vec2 aTargetPos[MAX_CLIENTS];
 			vec2 aTargetVel[MAX_CLIENTS];
@@ -435,8 +438,10 @@ void CBot::HandleWeapon(bool SeeTarget)
 					vec2 dir = direction(2*i*pi / BOT_HOOK_DIRS);
 					vec2 NextPos = aProjectilePos[i];
 					NextPos.x += dir.x*DTime;
-					NextPos.y += dir.y*DTime + Curvature/10000*(DTime*DTime)*(2*k+1);
-					aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
+					NextPos.y += dir.y*DTime + Curvature*(DTime*DTime)*(2*k+1);
+					//dbg_msg("bot","projectile step dist=%f",distance(aProjectilePos[i], NextPos));
+					//aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
+					aIsDead[i] = BotEngine()->IntersectSegment(aProjectilePos[i], NextPos, &NextPos);
 					for(int c = 0; c < Count; c++)
 					{
 						vec2 InterPos = closest_point_on_line(aProjectilePos[i],NextPos, aTargetPos[c]);
@@ -463,16 +468,14 @@ void CBot::HandleWeapon(bool SeeTarget)
 	}
 	if(Weapon > -1)
 	{
-		if(m_LastData.m_WantedWeapon != Weapon+1)
-		{
-			m_InputData.m_WantedWeapon = Weapon+1;
-			m_InputData.m_Fire = 0;
-		}
-		else
-			m_InputData.m_Fire = m_LastData.m_Fire^1;
+		m_InputData.m_WantedWeapon = Weapon+1;
+		m_InputData.m_Fire = m_LastData.m_Fire^1;
 		if(m_InputData.m_Fire)
 			m_Target = Target;
 	}
+	else if(pMe->m_aWeapons[WEAPON_GUN].m_Ammo != 10)
+		m_InputData.m_WantedWeapon = WEAPON_GUN+1;
+
 
 	// Accuracy
 	// float Angle = angle(m_Target) + (random_int()%64-32)*pi / 1024.0f;
@@ -498,7 +501,7 @@ void CBot::UpdateEdge()
 		//m_pPath->m_Size = BotEngine()->GetPartialPath(Pos, m_ComputeTarget.m_Pos, m_pPath->m_pVertices, 10);
 		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
 		m_ComputeTarget.m_NeedUpdate = false;
-		dbg_msg("bot", "new path of size=%d for type=%d cid=%d", m_pPath->m_Size, m_ComputeTarget.m_Type, m_ComputeTarget.m_PlayerCID);
+		dbg_msg("bot", "%d new path of size=%d for type=%d cid=%d", m_pPlayer->GetCID(), m_pPath->m_Size, m_ComputeTarget.m_Type, m_ComputeTarget.m_PlayerCID);
 		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
 		// 	dbg_msg("bot", "\t(%f, %f)", m_WalkingEdge.m_pPath[i].x, m_WalkingEdge.m_pPath[i].y);
 	}

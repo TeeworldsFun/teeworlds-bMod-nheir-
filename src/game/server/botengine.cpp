@@ -300,7 +300,8 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 
 void CBotEngine::GenerateSegments()
 {
-	int SegmentCount = 0;
+	int VSegmentCount = 0;
+	int HSegmentCount = 0;
 	// Vertical segments
 	for(int i = 1;i < m_Width-1; i++)
 	{
@@ -312,20 +313,53 @@ void CBotEngine::GenerateSegments()
 				left = true;
 			else if(left)
 			{
-				SegmentCount++;
+				VSegmentCount++;
 				left = false;
 			}
 			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i-1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
 				right = true;
 			else if(right)
 			{
-				SegmentCount++;
+				VSegmentCount++;
 				right = false;
 			}
 		}
+		if(left)
+			VSegmentCount++;
+		if(right)
+			VSegmentCount++;
 	}
-	dbg_msg("botengine","Found %d vertical segments, (expect as much horizontal segments)", SegmentCount);
-	m_SegmentCount = SegmentCount*2;
+	// Horizontal segments
+	for(int j = 1; j < m_Height-1; j++)
+	{
+		bool up = false;
+		bool down = false;
+		for(int i = 1; i < m_Width-1; i++)
+		{
+			if(up && ((m_pGrid[i+j*m_Width] & GTILE_MASK) <= GTILE_AIR || (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) > GTILE_AIR))
+			{
+				HSegmentCount++;
+				up = false;
+			}
+			if(down && ((m_pGrid[i+j*m_Width] & GTILE_MASK) <= GTILE_AIR || (m_pGrid[i+(j-1)*m_Width] & GTILE_MASK) > GTILE_AIR))
+			{
+				HSegmentCount++;
+				down = false;
+			}
+
+			if(!up && (m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
+				up = true;
+			if(!down && (m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j-1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
+				down = true;
+		}
+		if(up)
+			HSegmentCount++;
+		if(down)
+			HSegmentCount++;
+	}
+	dbg_msg("botengine","Found %d vertical segments, and %d horizontal segments)", VSegmentCount, HSegmentCount);
+	m_SegmentCount = HSegmentCount+VSegmentCount;
+	m_HSegmentCount = HSegmentCount;
 	m_pSegments = (CSegment*) mem_alloc(m_SegmentCount*sizeof(CSegment),1);
 	CSegment* pSegment = m_pSegments;
 	// Horizontal segments
@@ -363,6 +397,18 @@ void CBotEngine::GenerateSegments()
 				down = true;
 			}
 		}
+		if(up)
+		{
+			pSegment->m_B = vec2((m_Width-1)*32,(j+1)*32);
+			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
+			pSegment++;
+		}
+		if(down)
+		{
+			pSegment->m_B = vec2((m_Width-1)*32,j*32);
+			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
+			pSegment++;
+		}
 	}
 	// Vertical segments
 	for(int i = 1;i < m_Width-1; i++)
@@ -398,12 +444,26 @@ void CBotEngine::GenerateSegments()
 				right = true;
 			}
 		}
+		if(left)
+		{
+			pSegment->m_B = vec2((i+1)*32,(m_Height-1)*32);
+			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
+			pSegment++;
+			left = false;
+		}
+		if(right)
+		{
+			pSegment->m_B = vec2(i*32,(m_Height-1)*32);
+			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
+			pSegment++;
+			right = false;
+		}
 	}
 	dbg_msg("botengine","Allocate %d segments, use %d", m_SegmentCount, pSegment - m_pSegments);
 	if(m_SegmentCount != pSegment - m_pSegments)
 		exit(1);
-	qsort(m_pSegments,SegmentCount,sizeof(CSegment),SegmentComp);
-	qsort(m_pSegments+SegmentCount,SegmentCount,sizeof(CSegment),SegmentComp);
+	qsort(m_pSegments,HSegmentCount,sizeof(CSegment),SegmentComp);
+	qsort(m_pSegments+HSegmentCount,VSegmentCount,sizeof(CSegment),SegmentComp);
 }
 
 int CBotEngine::SegmentComp(const void *a, const void *b)
@@ -695,68 +755,83 @@ void CBotEngine::GenerateGraphFromTriangles()
 	m_Graph.ComputeClosestPath();
 }
 
-int CBotEngine::IntersectSegment(vec2 P1, vec2 P2)
+int CBotEngine::IntersectSegment(vec2 P1, vec2 P2, vec2 *pPos)
 {
+	float T = 1;
 	// Horizontal
-	float my = min(P1.y, P2.y);
-	float My = max(P1.y, P2.y);
-	int i = 0, j = m_SegmentCount >> 1;
-	while(i+1<j)
+	if(P1.y != P2.y)
 	{
-		int k = (i+j)>>1;
-		if(m_pSegments[k].m_A.y < my)
-			i = k;
-		else
-			j = k;
-	}
-	int d = j;
-	j = m_SegmentCount >> 1;
-	while(i+1<j)
-	{
-		int k = (i+j)>>1;
-		if(m_pSegments[k].m_A.y <= My)
-			i = k;
-		else
-			j = k;
-	}
-	int f = i+1;
-	for(int k = d; k < f ; k++)
-	{
-		float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
-		float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
-		if(d1*d2 < 0)
-			return 1;
+		float my = min(P1.y, P2.y);
+		float My = max(P1.y, P2.y);
+		float idy = 1.f/(P2.y-P1.y);
+		int i = 0, j = m_HSegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.y < my)
+				i = k;
+			else
+				j = k;
+		}
+		int d = j;
+		j = m_HSegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.y <= My)
+				i = k;
+			else
+				j = k;
+		}
+		int f = i+1;
+		for(int k = d; k < f ; k++)
+		{
+			float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+			float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+			if(d1*d2 < 0)
+				T = min(T,(m_pSegments[k].m_A.y-P1.y)*idy);
+		}
 	}
 
 	// Vertical
-	float mx = min(P1.x, P2.x);
-	float Mx = max(P1.x, P2.x);
-	i = m_SegmentCount >> 1, j = m_SegmentCount;
-	while(i+1<j)
+	if(P1.x != P2.x)
 	{
-		int k = (i+j)>>1;
-		if(m_pSegments[k].m_A.x < mx)
-			i = k;
-		else
-			j = k;
+		float mx = min(P1.x, P2.x);
+		float Mx = max(P1.x, P2.x);
+		float idx = 1.f/(P2.x-P1.x);
+		int i = m_HSegmentCount, j = m_SegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.x < mx)
+				i = k;
+			else
+				j = k;
+		}
+		int d = j;
+		j = m_SegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.x <= Mx)
+				i = k;
+			else
+				j = k;
+		}
+		int f = i+1;
+		for(int k = d; k < f ; k++)
+		{
+			float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
+			float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
+			if(d1*d2 < 0)
+				T = min(T,(m_pSegments[k].m_A.x-P1.x)*idx);
+		}
 	}
-	d = j;
-	j = m_SegmentCount;
-	while(i+1<j)
+	if(T < 1)
 	{
-		int k = (i+j)>>1;
-		if(m_pSegments[k].m_A.x <= Mx)
-			i = k;
-		else
-			j = k;
-	}
-	f = i+1;
-	for(int k = d; k < f ; k++)
-	{
-		float d1 = det(m_pSegments[k].m_A - P1, P2 - P1);
-		float d2 = det(m_pSegments[k].m_B - P1, P2 - P1);
-		if(d1*d2 < 0)
-			return 1;
+		if(pPos)
+			*pPos = mix(P1,P2,T);
+		return 1;
 	}
 	return 0;
 }
@@ -895,13 +970,13 @@ int CBotEngine::DistanceToEdge(CEdge Edge, vec2 Pos)
 	return distance(InterPos,Pos);
 }
 
-// Need somthing smarter
+// Need something smarter
 int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 {
 	for(int k = pPath->m_Size-1 ; k >=0 ; k--)
 	{
 		int D = distance(Pos, pPath->m_pVertices[k]);
-		if( D < 200)
+		if( D < 1000)
 		{
 			vec2 VertexPos = pPath->m_pVertices[k];
 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;
