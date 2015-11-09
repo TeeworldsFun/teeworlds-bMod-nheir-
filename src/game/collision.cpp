@@ -1,5 +1,7 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
+#include <stdlib.h> // qsort
+
 #include <base/system.h>
 #include <base/math.h>
 #include <base/vmath.h>
@@ -18,6 +20,15 @@ CCollision::CCollision()
 	m_Width = 0;
 	m_Height = 0;
 	m_pLayers = 0;
+	m_pSegments = 0;
+	m_SegmentCount = 0;
+	m_HSegmentCount = 0;
+}
+
+CCollision::~CCollision()
+{
+	if(m_pSegments)
+		mem_free(m_pSegments);
 }
 
 void CCollision::Init(class CLayers *pLayers)
@@ -50,6 +61,235 @@ void CCollision::Init(class CLayers *pLayers)
 			m_pTiles[i].m_Index = 0;
 		}
 	}
+
+	BuildSegments();
+}
+
+void CCollision::BuildSegments()
+{
+	int VSegmentCount = 0;
+	int HSegmentCount = 0;
+	// Vertical segments
+	for(int i = 1;i < m_Width-1; i++)
+	{
+		bool right = false;
+		bool left = false;
+		for(int j = 1; j < m_Height-1; j++)
+		{
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+1+j*m_Width].m_Index <= 128 && m_pTiles[i+1+j*m_Width].m_Index & COLFLAG_SOLID))
+				left = true;
+			else if(left)
+			{
+				VSegmentCount++;
+				left = false;
+			}
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i-1+j*m_Width].m_Index <= 128 && m_pTiles[i-1+j*m_Width].m_Index & COLFLAG_SOLID))
+				right = true;
+			else if(right)
+			{
+				VSegmentCount++;
+				right = false;
+			}
+		}
+		if(left)
+			VSegmentCount++;
+		if(right)
+			VSegmentCount++;
+	}
+	// Horizontal segments
+	for(int j = 1; j < m_Height-1; j++)
+	{
+		bool up = false;
+		bool down = false;
+		for(int i = 1; i < m_Width-1; i++)
+		{
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+(j+1)*m_Width].m_Index <= 128 && m_pTiles[i+(j+1)*m_Width].m_Index & COLFLAG_SOLID))
+				up = true;
+			else if(up)
+			{
+				HSegmentCount++;
+				up = false;
+			}
+
+			if(((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+(j-1)*m_Width].m_Index <= 128 && m_pTiles[i+(j-1)*m_Width].m_Index & COLFLAG_SOLID)))
+				down = true;
+			else if(down)
+			{
+				HSegmentCount++;
+				down = false;
+			}
+		}
+		if(up)
+			HSegmentCount++;
+		if(down)
+			HSegmentCount++;
+	}
+	m_SegmentCount = HSegmentCount+VSegmentCount;
+	m_HSegmentCount = HSegmentCount;
+	if(m_pSegments)
+		mem_free(m_pSegments);
+	m_pSegments = (CSegment*) mem_alloc(m_SegmentCount*sizeof(CSegment),1);
+	CSegment* pSegment = m_pSegments;
+
+	// Horizontal segments
+	for(int j = 1; j < m_Height-1; j++)
+	{
+		bool up = false;
+		bool down = false;
+		int up_i, down_i;
+		for(int i = 0; i < m_Width; i++)
+		{
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+(j+1)*m_Width].m_Index <= 128 && m_pTiles[i+(j+1)*m_Width].m_Index & COLFLAG_SOLID))
+			{
+				if(!up)
+					up_i = i;
+				up = true;
+			}
+			else if(up)
+			{
+				pSegment->m_IsVertical = false;
+				if(!up_i)
+					up_i = -200;
+				pSegment->m_A = vec2(up_i*32,(j+1)*32);
+				pSegment->m_B = vec2(i*32,(j+1)*32);
+				pSegment++;
+				up = false;
+			}
+			if(((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+(j-1)*m_Width].m_Index <= 128 && m_pTiles[i+(j-1)*m_Width].m_Index & COLFLAG_SOLID)))
+			{
+				if(!down)
+					down_i = i;
+				down = true;
+			}
+			else if(down)
+			{
+				pSegment->m_IsVertical = false;
+				if(!down_i)
+					down_i = -200;
+				pSegment->m_A = vec2(down_i*32,j*32);
+				pSegment->m_B = vec2(i*32,j*32);
+				pSegment++;
+				down = false;
+			}
+		}
+		if(up)
+		{
+			pSegment->m_IsVertical = false;
+			if(!up_i)
+				up_i = -200;
+			pSegment->m_A = vec2(up_i*32,(j+1)*32);
+			pSegment->m_B = vec2((m_Width+200)*32,(j+1)*32);
+			pSegment++;
+			up = false;
+		}
+		if(down)
+		{
+			pSegment->m_IsVertical = false;
+			if(!down_i)
+				down_i = -200;
+			pSegment->m_A = vec2(down_i*32,j*32);
+			pSegment->m_B = vec2((m_Width+200)*32,j*32);
+			pSegment++;
+			down = false;
+		}
+	}
+	// Vertical segments
+	for(int i = 1;i < m_Width-1; i++)
+	{
+		bool right = false;
+		bool left = false;
+		int right_j, left_j;
+		for(int j = 0; j < m_Height; j++)
+		{
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i+1+j*m_Width].m_Index <= 128 && m_pTiles[i+1+j*m_Width].m_Index & COLFLAG_SOLID))
+			{
+				if(!left)
+					right_j = j;
+				left = true;
+			}
+			else if(left)
+			{
+				pSegment->m_IsVertical = true;
+				if(!left_j)
+					left_j = -200;
+				pSegment->m_A = vec2((i+1)*32,right_j*32);
+				pSegment->m_B = vec2((i+1)*32,j*32);
+				pSegment++;
+				left = false;
+			}
+			if((m_pTiles[i+j*m_Width].m_Index <= 128 && m_pTiles[i+j*m_Width].m_Index & COLFLAG_SOLID) && !(m_pTiles[i-1+j*m_Width].m_Index <= 128 && m_pTiles[i-1+j*m_Width].m_Index & COLFLAG_SOLID))
+			{
+				if(!right)
+					right_j = j;
+				right = true;
+			}
+			else if(right)
+			{
+				pSegment->m_IsVertical = true;
+				if(!right_j)
+					right_j = -200;
+				pSegment->m_A = vec2(i*32,right_j*32);
+				pSegment->m_B = vec2(i*32,j*32);
+				pSegment++;
+				right = false;
+			}
+		}
+		if(left)
+		{
+			pSegment->m_IsVertical = true;
+			if(!left_j)
+				left_j = -200;
+			pSegment->m_A = vec2((i+1)*32,left_j*32);
+			pSegment->m_B = vec2((i+1)*32,(m_Height+200)*32);
+			pSegment++;
+			left = false;
+		}
+		if(right)
+		{
+			pSegment->m_IsVertical = true;
+			if(!right_j)
+				right_j = -200;
+			pSegment->m_A = vec2(i*32,right_j*32);
+			pSegment->m_B = vec2(i*32,(m_Height+200)*32);
+			pSegment++;
+			right = false;
+		}
+	}
+	dbg_msg("collision","Allocate %d segments, use %d", m_SegmentCount, pSegment - m_pSegments);
+
+	qsort(m_pSegments,HSegmentCount,sizeof(CSegment),SegmentComp);
+	qsort(m_pSegments+HSegmentCount,VSegmentCount,sizeof(CSegment),SegmentComp);
+}
+
+int CCollision::SegmentComp(const void *a, const void *b)
+{
+	CSegment *s0 = (CSegment *)a;
+	CSegment *s1 = (CSegment *)b;
+	if(s0->m_IsVertical && !s1->m_IsVertical)
+		return 1;
+	if(!s0->m_IsVertical && s1->m_IsVertical)
+		return -1;
+	if(s0->m_IsVertical)
+	{
+		if(s0->m_A.x < s1->m_A.x)
+			return -1;
+		if(s0->m_A.x > s1->m_A.x)
+			return 1;
+		if(s0->m_A.y < s1->m_A.y)
+			return -1;
+		if(s0->m_A.y > s1->m_A.y)
+			return 1;
+		return 0;
+	}
+	if(s0->m_A.y < s1->m_A.y)
+		return -1;
+	if(s0->m_A.y > s1->m_A.y)
+		return 1;
+	if(s0->m_A.x < s1->m_A.x)
+		return -1;
+	if(s0->m_A.x > s1->m_A.x)
+		return 1;
+	return 0;
 }
 
 int CCollision::GetTile(int x, int y) const
@@ -90,6 +330,123 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 		*pOutCollision = Pos1;
 	if(pOutBeforeCollision)
 		*pOutBeforeCollision = Pos1;
+	return 0;
+}
+
+int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos2, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
+{
+	float T = 1;
+	if(CheckPoint(Pos0.x, Pos0.y))
+	{
+		if(pOutCollision)
+			*pOutCollision = Pos0;
+		if(pOutBeforeCollision)
+			*pOutBeforeCollision = Pos0;
+		return GetCollisionAt(Pos0.x, Pos0.y);
+	}
+	// Horizontal
+	if(Pos0.y != Pos2.y)
+	{
+		float my = min(Pos0.y, Pos2.y);
+		float My = max(Pos0.y, Pos2.y);
+		float idy = 1.f/(Pos2.y-Pos0.y);
+		int i = 0, j = m_HSegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.y < my)
+				i = k;
+			else
+				j = k;
+		}
+		int d = j;
+		j = m_HSegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.y <= My)
+				i = k;
+			else
+				j = k;
+		}
+		int f = i+1;
+		for(int k = d; k < f ; k++)
+		{
+			float d1 = det(m_pSegments[k].m_A - Pos0, Pos2 - Pos0);
+			float d2 = det(m_pSegments[k].m_B - Pos0, Pos2 - Pos0);
+			if(d1*d2 < 0)
+			{
+				float Temp = (m_pSegments[k].m_A.y-Pos0.y)*idy;
+				if(Temp < T)
+					T = Temp;
+			}
+		}
+	}
+
+	bool Vertical = false;
+	// Vertical
+	if(Pos0.x != Pos2.x)
+	{
+		float mx = min(Pos0.x, Pos2.x);
+		float Mx = max(Pos0.x, Pos2.x);
+		float idx = 1.f/(Pos2.x-Pos0.x);
+		int i = m_HSegmentCount, j = m_SegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.x < mx)
+				i = k;
+			else
+				j = k;
+		}
+		int d = j;
+		j = m_SegmentCount;
+		while(i+1<j)
+		{
+			int k = (i+j)>>1;
+			if(m_pSegments[k].m_A.x <= Mx)
+				i = k;
+			else
+				j = k;
+		}
+		int f = i+1;
+		for(int k = d; k < f ; k++)
+		{
+			float d1 = det(m_pSegments[k].m_A - Pos0, Pos2 - Pos0);
+			float d2 = det(m_pSegments[k].m_B - Pos0, Pos2 - Pos0);
+			if(d1*d2 < 0)
+			{
+				float Temp = (m_pSegments[k].m_A.x-Pos0.x)*idx;
+				if(Temp < T)
+				{
+					T = Temp;
+					Vertical = true;
+				}
+			}
+		}
+	}
+	if(T < 1)
+	{
+		T = clamp(T,0.f,1.f);
+		vec2 Pos = mix(Pos0,Pos2,T);
+		vec2 Dir = normalize(Pos2-Pos0);
+		if(pOutCollision)
+			*pOutCollision = Pos;
+		if(pOutBeforeCollision)
+		{
+			if(Vertical)
+				Dir *= 0.5f / absolute(Dir.x) + 1.f;
+			else
+				Dir *= 0.5f / absolute(Dir.y) + 1.f;
+			*pOutBeforeCollision = Pos - Dir;
+		}
+		Pos += normalize(Pos2-Pos0)*16.f;
+		return GetCollisionAt(Pos.x, Pos.y);
+	}
+	if(pOutCollision)
+		*pOutCollision = Pos2;
+	if(pOutBeforeCollision)
+		*pOutBeforeCollision = Pos2;
 	return 0;
 }
 
