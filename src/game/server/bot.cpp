@@ -191,7 +191,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 	{
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
 		//InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
-		InSight = !BotEngine()->IntersectSegment(Pos, pClosest->m_Pos, 0);
+		InSight = !Collision()->IntersectSegment(Pos, pClosest->m_Pos, 0, 0);
 		m_Target = pClosest->m_Pos - Pos;
 		m_RealTarget = pClosest->m_Pos;
 	}
@@ -440,7 +440,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 					NextPos.y += dir.y*DTime + Curvature*(DTime*DTime)*(2*k+1);
 					//dbg_msg("bot","projectile step dist=%f",distance(aProjectilePos[i], NextPos));
 					//aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
-					aIsDead[i] = BotEngine()->IntersectSegment(aProjectilePos[i], NextPos, &NextPos);
+					aIsDead[i] = Collision()->IntersectSegment(aProjectilePos[i], NextPos, &NextPos, 0);
 					for(int c = 0; c < Count; c++)
 					{
 						vec2 InterPos = closest_point_on_line(aProjectilePos[i],NextPos, aTargetPos[c]);
