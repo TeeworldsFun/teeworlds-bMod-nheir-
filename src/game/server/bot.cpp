@@ -145,7 +145,7 @@ void CBot::UpdateTarget()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
 	{
 		CPlayer *pPlayer = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID];
-		if(Collision()->IntersectLine(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
+		if(Collision()->IntersectSegment(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
 		{
 			m_ComputeTarget.m_NeedUpdate = true;
 			m_ComputeTarget.m_Pos = pPlayer->GetCharacter()->GetPos();
@@ -303,7 +303,7 @@ void CBot::HandleHook(bool SeeTarget)
 				vec2 dir = direction(a);
 				vec2 Pos = pMe->m_Pos+dir*m_HookLength;
 
-				if((Collision()->IntersectLine(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
+				if((Collision()->IntersectSegment(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
 				{
 					vec2 HookVel = dir*GameServer()->Tuning()->m_HookDragAccel;
 
@@ -373,7 +373,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 		{
 			Weapon = WEAPON_HAMMER;
 		}
-		else if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectLine(Pos, apTarget[c]->m_Pos, 0, 0))
+		else if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectSegment(Pos, apTarget[c]->m_Pos, 0, 0))
 	  {
 	    Weapon = WEAPON_LASER;
 	  }
@@ -453,7 +453,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 				}
 				for(int c = 0; c < Count; c++)
 				{
-					Collision()->IntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
+					Collision()->IntersectSegment(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
 					aTargetVel[c].y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
 				}
 			}
@@ -591,7 +591,7 @@ void CBot::MakeChoice()
 	if(!(pMe->m_Jumped))
 	{
 		vec2 Vel(pMe->m_Vel.x, min(pMe->m_Vel.y, 0.0f));
-		if(Collision()->IntersectLine(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->IntersectLine(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0) && (m_Target.y < 0))
+		if(Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0) && (m_Target.y < 0))
 			Flags |= BFLAG_JUMP;
 		if(m_Target.y < 0 && absolute(m_Target.x) < 28.f && pMe->m_Vel.y > -1.f)
 			Flags |= BFLAG_JUMP;
