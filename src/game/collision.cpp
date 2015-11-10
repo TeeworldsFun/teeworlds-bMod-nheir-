@@ -333,7 +333,7 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 	return 0;
 }
 
-int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos2, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
+int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
 {
 	float T = 1;
 	if(CheckPoint(Pos0.x, Pos0.y))
@@ -345,91 +345,121 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos2, vec2 *pOutCollision, vec2
 		return GetCollisionAt(Pos0.x, Pos0.y);
 	}
 	// Horizontal
-	if(Pos0.y != Pos2.y)
+	if(Pos0.y != Pos1.y)
 	{
-		float my = min(Pos0.y, Pos2.y);
-		float My = max(Pos0.y, Pos2.y);
-		float idy = 1.f/(Pos2.y-Pos0.y);
+		float idy = 1.f/(Pos1.y-Pos0.y);
 		int i = 0, j = m_HSegmentCount;
-		while(i+1<j)
+		if(Pos0.y < Pos1.y)
 		{
-			int k = (i+j)>>1;
-			if(m_pSegments[k].m_A.y < my)
-				i = k;
-			else
-				j = k;
-		}
-		int d = j;
-		j = m_HSegmentCount;
-		while(i+1<j)
-		{
-			int k = (i+j)>>1;
-			if(m_pSegments[k].m_A.y <= My)
-				i = k;
-			else
-				j = k;
-		}
-		int f = i+1;
-		for(int k = d; k < f ; k++)
-		{
-			float d1 = det(m_pSegments[k].m_A - Pos0, Pos2 - Pos0);
-			float d2 = det(m_pSegments[k].m_B - Pos0, Pos2 - Pos0);
-			if(d1*d2 < 0)
+			while(i+1<j)
 			{
-				float Temp = (m_pSegments[k].m_A.y-Pos0.y)*idy;
-				if(Temp < T)
-					T = Temp;
+				int k = (i+j)>>1;
+				if(m_pSegments[k].m_A.y < Pos0.y)
+					i = k;
+				else
+					j = k;
+			}
+			i++;
+			while(i < m_HSegmentCount && m_pSegments[i].m_A.y <= Pos1.y)
+			{
+				float d1 = det(m_pSegments[i].m_A - Pos0, Pos1 - Pos0);
+				float d2 = det(m_pSegments[i].m_B - Pos0, Pos1 - Pos0);
+				if(d1*d2 < 0)
+				{
+					T = (m_pSegments[i].m_A.y-Pos0.y)*idy;
+					break;
+				}
+				i++;
+			}
+		}
+		else
+		{
+			while(i+1<j)
+			{
+				int k = (i+j)>>1;
+				if(m_pSegments[k].m_A.y <= Pos0.y)
+					i = k;
+				else
+					j = k;
+			}
+			j--;
+			while(j >= 0 && m_pSegments[j].m_A.y > Pos1.y)
+			{
+				float d1 = det(m_pSegments[j].m_A - Pos0, Pos1 - Pos0);
+				float d2 = det(m_pSegments[j].m_B - Pos0, Pos1 - Pos0);
+				if(d1*d2 < 0)
+				{
+					T = (m_pSegments[j].m_A.y-Pos0.y)*idy;
+					break;
+				}
+				j--;
 			}
 		}
 	}
 
 	bool Vertical = false;
 	// Vertical
-	if(Pos0.x != Pos2.x)
+	if(Pos0.x != Pos1.x)
 	{
-		float mx = min(Pos0.x, Pos2.x);
-		float Mx = max(Pos0.x, Pos2.x);
-		float idx = 1.f/(Pos2.x-Pos0.x);
+		float idx = 1.f/(Pos1.x-Pos0.x);
 		int i = m_HSegmentCount, j = m_SegmentCount;
-		while(i+1<j)
+		if(Pos0.x < Pos1.x)
 		{
-			int k = (i+j)>>1;
-			if(m_pSegments[k].m_A.x < mx)
-				i = k;
-			else
-				j = k;
-		}
-		int d = j;
-		j = m_SegmentCount;
-		while(i+1<j)
-		{
-			int k = (i+j)>>1;
-			if(m_pSegments[k].m_A.x <= Mx)
-				i = k;
-			else
-				j = k;
-		}
-		int f = i+1;
-		for(int k = d; k < f ; k++)
-		{
-			float d1 = det(m_pSegments[k].m_A - Pos0, Pos2 - Pos0);
-			float d2 = det(m_pSegments[k].m_B - Pos0, Pos2 - Pos0);
-			if(d1*d2 < 0)
+			while(i+1<j)
 			{
-				float Temp = (m_pSegments[k].m_A.x-Pos0.x)*idx;
-				if(Temp < T)
+				int k = (i+j)>>1;
+				if(m_pSegments[k].m_A.x < Pos0.x)
+					i = k;
+				else
+					j = k;
+			}
+			i++;
+			while(i < m_SegmentCount && m_pSegments[i].m_A.x <= Pos1.x)
+			{
+				float d1 = det(m_pSegments[i].m_A - Pos0, Pos1 - Pos0);
+				float d2 = det(m_pSegments[i].m_B - Pos0, Pos1 - Pos0);
+				if(d1*d2 < 0)
 				{
-					T = Temp;
-					Vertical = true;
+					T = (m_pSegments[i].m_A.x-Pos0.x)*idx;
+					break;
 				}
+				i++;
+			}
+		}
+		else
+		{
+			while(i+1<j)
+			{
+				int k = (i+j)>>1;
+				if(m_pSegments[k].m_A.x <= Pos0.x)
+					i = k;
+				else
+					j = k;
+			}
+			j--;
+			while(j >= m_HSegmentCount && m_pSegments[j].m_A.x > Pos1.x)
+			{
+				float d1 = det(m_pSegments[j].m_A - Pos0, Pos1 - Pos0);
+				float d2 = det(m_pSegments[j].m_B - Pos0, Pos1 - Pos0);
+				if(d1*d2 < 0)
+				{
+					float Temp = (m_pSegments[j].m_A.x-Pos0.x)*idx;
+					if(Temp < T)
+					{
+						T = Temp;
+						Vertical = true;
+						break;
+					}
+				}
+				j--;
 			}
 		}
 	}
 	if(T < 1)
 	{
 		T = clamp(T,0.f,1.f);
-		vec2 Pos = mix(Pos0,Pos2,T);
-		vec2 Dir = normalize(Pos2-Pos0);
+		vec2 Pos = mix(Pos0,Pos1,T);
+		vec2 Dir = normalize(Pos1-Pos0);
 		if(pOutCollision)
 			*pOutCollision = Pos;
 		if(pOutBeforeCollision)
@@ -440,13 +470,13 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos2, vec2 *pOutCollision, vec2
 				Dir *= 0.5f / absolute(Dir.y) + 1.f;
 			*pOutBeforeCollision = Pos - Dir;
 		}
-		Pos += normalize(Pos2-Pos0)*16.f;
+		Pos += normalize(Pos1-Pos0)*16.f;
 		return GetCollisionAt(Pos.x, Pos.y);
 	}
 	if(pOutCollision)
-		*pOutCollision = Pos2;
+		*pOutCollision = Pos1;
 	if(pOutBeforeCollision)
-		*pOutBeforeCollision = Pos2;
+		*pOutBeforeCollision = Pos1;
 	return 0;
 }
 
