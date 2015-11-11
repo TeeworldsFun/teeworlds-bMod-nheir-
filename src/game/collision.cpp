@@ -345,9 +345,6 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 
 int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
 {
-	float T = 1;
-	vec2 Pos;
-	vec2 Dir = normalize(Pos1-Pos0);
 	// Check if the starting point is in a solid tile
 	if(CheckPoint(Pos0))
 	{
@@ -357,12 +354,16 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 			*pOutBeforeCollision = Pos0;
 		return GetCollisionAt(Pos0.x, Pos0.y);
 	}
+	float T = 1;
+	vec2 Pos;
+	vec2 DiffPos = Pos1-Pos0;
+	vec2 Dir = normalize(DiffPos);
 	// Horizontal
-	if(Pos0.y != Pos1.y)
+	if(DiffPos.y)
 	{
-		float idy = 1.f/(Pos1.y-Pos0.y);
+		float idy = 1.f/DiffPos.y;
 		int i = 0, j = m_HSegmentCount;
-		if(Pos0.y < Pos1.y)
+		if(DiffPos.y > 0)
 		{
 			// Look for the first segment with y-coordinate >= Pos0.y
 			while(i+1<j)
@@ -375,8 +376,8 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 			}
 			while(j < m_HSegmentCount && m_pSegments[j].m_A.y <= Pos1.y)
 			{
-				float d1 = det(m_pSegments[j].m_A - Pos0, Pos1 - Pos0);
-				float d2 = det(m_pSegments[j].m_B - Pos0, Pos1 - Pos0);
+				float d1 = det(m_pSegments[j].m_A - Pos0, DiffPos);
+				float d2 = det(m_pSegments[j].m_B - Pos0, DiffPos);
 				if(d1*d2 <= 0)
 				{
 					float Temp = (m_pSegments[j].m_A.y-Pos0.y)*idy;
@@ -402,8 +403,8 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 			}
 			while(i >= 0 && m_pSegments[i].m_A.y > Pos1.y)
 			{
-				float d1 = det(m_pSegments[i].m_A - Pos0, Pos1 - Pos0);
-				float d2 = det(m_pSegments[i].m_B - Pos0, Pos1 - Pos0);
+				float d1 = det(m_pSegments[i].m_A - Pos0, DiffPos);
+				float d2 = det(m_pSegments[i].m_B - Pos0, DiffPos);
 				if(d1*d2 <= 0)
 				{
 					float Temp = (m_pSegments[i].m_A.y-Pos0.y)*idy;
@@ -420,11 +421,11 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 
 	bool Vertical = false;
 	// Vertical
-	if(Pos0.x != Pos1.x)
+	if(DiffPos.x)
 	{
-		float idx = 1.f/(Pos1.x-Pos0.x);
+		float idx = 1.f/DiffPos.x;
 		int i = m_HSegmentCount, j = m_SegmentCount;
-		if(Pos0.x < Pos1.x)
+		if(DiffPos.x > 0)
 		{
 			// Look for the first segment with x-coordinate >= Pos0.x
 			while(i+1<j)
@@ -437,8 +438,8 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 			}
 			while(j < m_SegmentCount && m_pSegments[j].m_A.x <= Pos1.x)
 			{
-				float d1 = det(m_pSegments[j].m_A - Pos0, Pos1 - Pos0);
-				float d2 = det(m_pSegments[j].m_B - Pos0, Pos1 - Pos0);
+				float d1 = det(m_pSegments[j].m_A - Pos0, DiffPos);
+				float d2 = det(m_pSegments[j].m_B - Pos0, DiffPos);
 				if(d1*d2 <= 0)
 				{
 					float Temp = (m_pSegments[j].m_A.x-Pos0.x)*idx;
@@ -465,8 +466,8 @@ int CCollision::IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2
 			}
 			while(i >= m_HSegmentCount && m_pSegments[i].m_A.x >= Pos1.x)
 			{
-				float d1 = det(m_pSegments[i].m_A - Pos0, Pos1 - Pos0);
-				float d2 = det(m_pSegments[i].m_B - Pos0, Pos1 - Pos0);
+				float d1 = det(m_pSegments[i].m_A - Pos0, DiffPos);
+				float d2 = det(m_pSegments[i].m_B - Pos0, DiffPos);
 				if(d1*d2 <= 0)
 				{
 					float Temp = (m_pSegments[i].m_A.x-Pos0.x)*idx;
