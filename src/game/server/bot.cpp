@@ -16,13 +16,7 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 	m_pBotEngine = pBotEngine;
 	m_pPlayer = pPlayer;
 	m_pGameServer = pBotEngine->GameServer();
-	m_State = BOT_IDLE;
-	m_HookLength = Tuning()->m_HookLength*0.9f;
 	m_Flags = 0;
-	m_LastCheck = 0;
-	mem_zero(m_AmmoCount, sizeof(m_AmmoCount));
-	m_AmmoCount[WEAPON_HAMMER] = -1;
-	m_Weapon = WEAPON_GUN;
 	mem_zero(&m_InputData, sizeof(m_InputData));
 	m_LastData = m_InputData;
 
@@ -40,12 +34,8 @@ CBot::~CBot()
 
 void CBot::OnReset()
 {
-	mem_zero(m_AmmoCount, sizeof(m_AmmoCount));
-	m_AmmoCount[WEAPON_HAMMER] = -1;
-	m_Weapon = WEAPON_GUN;
 	m_Flags = 0;
 	m_pPath->m_Size = 0;
-	m_TargetClient = -1;
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
 }
 
@@ -155,22 +145,11 @@ void CBot::UpdateTarget()
 
 bool CBot::IsGrounded()
 {
-	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
-
-	float PhysSize = 28.0f;
-
-	// get ground state
-	bool Grounded = false;
-	if(Collision()->CheckPoint(Pos.x+PhysSize/2, Pos.y+PhysSize/2+5))
-		Grounded = true;
-	if(Collision()->CheckPoint(Pos.x-PhysSize/2, Pos.y+PhysSize/2+5))
-		Grounded = true;
-	return Grounded;
+	return m_pPlayer->GetCharacter()->IsGrounded();
 }
 
 CNetObj_PlayerInput CBot::GetInputData()
 {
-	CheckState();
 	if(!m_pPlayer->GetCharacter())
 		return m_InputData;
 	const CCharacterCore *pMe = m_pPlayer->GetCharacter()->GetCore();
@@ -190,13 +169,12 @@ CNetObj_PlayerInput CBot::GetInputData()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
 	{
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
-		//InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos,0,0);
 		InSight = !Collision()->IntersectSegment(Pos, pClosest->m_Pos, 0, 0);
 		m_Target = pClosest->m_Pos - Pos;
 		m_RealTarget = pClosest->m_Pos;
 	}
 
-	MakeChoice2(InSight);
+	MakeChoice(InSight);
 
 	m_RealTarget = m_Target + Pos;
 
@@ -257,9 +235,9 @@ void CBot::HandleHook(bool SeeTarget)
 			m_InputData.m_Hook = 1;
 		else if(!m_InputData.m_Fire)
 		{
-			if(dist < m_HookLength*0.9f)
+			if(dist < Tuning()->m_HookLength*0.9f)
 				m_InputData.m_Hook = m_LastData.m_Hook^1;
-			SeeTarget = dist < m_HookLength*0.9f;
+			SeeTarget = dist < Tuning()->m_HookLength*0.9f;
 		}
 	}
 
@@ -301,7 +279,7 @@ void CBot::HandleHook(bool SeeTarget)
 			{
 				float a = 2*i*pi / NumDir;
 				vec2 dir = direction(a);
-				vec2 Pos = pMe->m_Pos+dir*m_HookLength;
+				vec2 Pos = pMe->m_Pos+dir*Tuning()->m_HookLength;
 
 				if((Collision()->IntersectSegment(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
 				{
@@ -501,41 +479,28 @@ void CBot::UpdateEdge()
 		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
 		m_ComputeTarget.m_NeedUpdate = false;
 		dbg_msg("bot", "%d new path of size=%d for type=%d cid=%d", m_pPlayer->GetCID(), m_pPath->m_Size, m_ComputeTarget.m_Type, m_ComputeTarget.m_PlayerCID);
-		// for(int i = 0; i < m_WalkingEdge.m_Size; i++)
-		// 	dbg_msg("bot", "\t(%f, %f)", m_WalkingEdge.m_pPath[i].x, m_WalkingEdge.m_pPath[i].y);
 	}
 }
 
-void CBot::MakeChoice2(bool UseTarget)
+void CBot::MakeChoice(bool UseTarget)
 {
-	if(UseTarget)
+	if(!UseTarget)
 	{
-		MakeChoice();
-		return;
-	}
-	vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
+		vec2 Pos = m_pPlayer->GetCharacter()->GetPos();
 
-	if(m_pPath->m_Size)
-	{
-		int dist = BotEngine()->FarestPointOnEdge(m_pPath, Pos, &m_Target);
-		if(dist >= 0)
+		if(m_pPath->m_Size)
 		{
-			UseTarget = true;
-			m_Target -= Pos;
+			int dist = BotEngine()->FarestPointOnEdge(m_pPath, Pos, &m_Target);
+			if(dist >= 0)
+			{
+				UseTarget = true;
+				m_Target -= Pos;
+			}
+			else
+				m_Target = BotEngine()->NextPoint(Pos,m_ComputeTarget.m_Pos) - Pos;
 		}
-		else
-			m_Target = BotEngine()->NextPoint(Pos,m_ComputeTarget.m_Pos) - Pos;
-
-		// else
-		// {
-		// 	dbg_msg("bot","edge not in sight");
-		// }
 	}
-	MakeChoice();
-}
 
-void CBot::MakeChoice()
-{
 	int Flags = 0;
 	CCharacterCore *pMe = m_pPlayer->GetCharacter()->GetCore();
 	CCharacterCore TempChar = *pMe;
@@ -617,14 +582,6 @@ void CBot::MakeChoice()
 	// 	m_Target = vec2(-14,28);
 	// }
 	m_Flags = Flags;
-}
-
-void CBot::CheckState()
-{
-	if(time_get() - m_LastCheck > BOT_CHECK_TIME)
-	{
-		//Say(0, "I am 100% computer controlled.");
-	}
 }
 
 void CBot::Snap(int SnappingClient)

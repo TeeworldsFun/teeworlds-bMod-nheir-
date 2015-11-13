@@ -44,22 +44,9 @@ protected:
 	class CCollision *Collision() { return GameServer()->Collision(); }
 	class CTuningParams *Tuning() { return GameServer()->Tuning(); }
 
-	int m_TargetClient;
-
 	CBotEngine::CPath *m_pPath;
 
 	int m_SnapID;
-
-	enum {
-		BOT_IDLE=0,
-		BOT_FLAG,
-		BOT_FIGHT
-	};
-
-	int m_State;
-
-	float m_HookLength;
-	int m_HookLocked;
 
 	enum {
 		BFLAG_LOST	= 0,
@@ -70,20 +57,7 @@ protected:
 		BFLAG_FIRE	= 16
 	};
 
-	int m_CurAnchor;
-
-	CEdge m_WalkingEdge;
-	int m_WalkStart;
-
 	int m_Flags;
-	int m_HookDir;
-	vec2 m_HookTarget;
-
-	int m_Weapon;
-	int m_AmmoCount[NUM_WEAPONS];
-	bool m_Fire;
-
-	int m_Suicide;
 
 	vec2 m_Target;
 	vec2 m_RealTarget;
@@ -105,14 +79,6 @@ protected:
 		bool m_NeedUpdate;
 	} m_ComputeTarget;
 
-	int m_aFlagTiles[2];
-
-	int m_EmoticonStart;
-
-	int64 m_LastCheck;
-
-	int m_ClientState;
-
 	CNetObj_PlayerInput m_InputData;
 	CNetObj_PlayerInput m_LastData;
 
@@ -125,11 +91,7 @@ protected:
 	void HandleWeapon(bool SeeTarget);
 	void HandleHook(bool SeeTarget);
 	void UpdateEdge();
-	void MakeChoice();
-	void MakeChoice2(bool UseTarget);
-	int Predict(class CCharacterCore *pMe, bool Input=false);
-
-	void CheckState();
+	void MakeChoice(bool UseTarget);
 
 	int GetTile(int x, int y) { return BotEngine()->GetTile(x/32,y/32);}
 
