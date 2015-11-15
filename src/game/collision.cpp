@@ -95,61 +95,52 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 
 int CCollision::FastIntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
 {
-	int i_a = round_to_int(Pos0.x)/32;
-	int j_a = round_to_int(Pos0.y)/32;
-	int i_b = round_to_int(Pos1.x)/32;
-	int j_b = round_to_int(Pos1.y)/32;
+	const int Tile0X = round_to_int(Pos0.x)/32;
+	const int Tile0Y = round_to_int(Pos0.y)/32;
+	const int Tile1X = round_to_int(Pos1.x)/32;
+	const int Tile1Y = round_to_int(Pos1.y)/32;
 
-	float idx = (i_a == i_b) ? 1.f : 1.f/(Pos1.x-Pos0.x);
-	float idy = (j_a == j_b) ? 1.f : 1.f/(Pos1.y-Pos0.y);
+	const float InvDeltaX = (Tile0X == Tile1X) ? 1.f : 1.f/(Pos1.x-Pos0.x);
+	const float InvDeltaY = (Tile0Y == Tile1Y) ? 1.f : 1.f/(Pos1.y-Pos0.y);
 
-	float cst = Pos0.x * Pos1.y - Pos0.y * Pos1.x;
+	const float DetPos = Pos0.x * Pos1.y - Pos0.y * Pos1.x;
 
-	int i = i_a, j = j_a;
-	int di = (i_a <= i_b) ? 1 : -1;
-	int dj = (j_a <= j_b) ? 1 : -1;
-	int ci = (i_a <= i_b) ? 1 : 0;
-	int cj = (j_a <= j_b) ? 1 : 0;
+	const int DeltaTileX = (Tile0X <= Tile1X) ? 1 : -1;
+	const int DeltaTileY = (Tile0Y <= Tile1Y) ? 1 : -1;
+	const int DeltaNextTileX = (Tile0X <= Tile1X) ? 1 : 0;
+	const int DeltaNextTileY = (Tile0Y <= Tile1Y) ? 1 : 0;
 
+	int CurTileX = Tile0X;
+	int CurTileY = Tile0Y;
 	vec2 Pos = Pos0;
 
 	bool Vertical = false;
 
-	float x = (32*(j+cj)*(Pos1.x-Pos0.x)+cst)*idy;
-	float y = (32*(i+ci)*(Pos1.y-Pos0.y)-cst)*idx;
-	while(i != i_b || j != j_b)
+	float NextPosX = (32*(CurTileY+DeltaNextTileY)*(Pos1.x-Pos0.x)+DetPos)*InvDeltaY;
+	float NextPosY = (32*(CurTileX+DeltaNextTileX)*(Pos1.y-Pos0.y)-DetPos)*InvDeltaX;
+
+	while(CurTileX != Tile1X || CurTileY != Tile1Y)
 	{
-		if(IsTileSolid(i*32,j*32))
+		if(IsTileSolid(CurTileX*32,CurTileY*32))
+			break;
+		if(CurTileY != Tile1Y && (CurTileX == Tile1X || NextPosY*DeltaTileY > 32*(CurTileY+DeltaNextTileY)*DeltaTileY))
 		{
-			if(pOutCollision)
-				*pOutCollision = Pos;
-			if(pOutBeforeCollision)
-			{
-				vec2 Dir = normalize(Pos1-Pos0);
-				if(Vertical)
-					Dir *= 0.5f / absolute(Dir.x) + 1.f;
-				else
-					Dir *= 0.5f / absolute(Dir.y) + 1.f;
-				*pOutBeforeCollision = Pos - Dir;
-			}
-			return GetTile(i*32,j*32);
-		}
-		if(j != j_b && (i == i_b || y*dj > 32*(j+cj)*dj))
-		{
-			Pos.x = x;
-			Pos.y = (j+cj)*32;
-			j += dj;
-			x = (32*(j+cj)*(Pos1.x-Pos0.x)+cst)*idy;
+			Pos.x = NextPosX;
+			Pos.y = (CurTileY+DeltaNextTileY)*32;
+			CurTileY += DeltaTileY;
+			NextPosX = (32*(CurTileY+DeltaNextTileY)*(Pos1.x-Pos0.x)+DetPos)*InvDeltaY;
 			Vertical = false;
-			continue;
 		}
-		Pos.x = (i+ci)*32;
-		Pos.y = y;
-		i += di;
-		y = (32*(i+ci)*(Pos1.y-Pos0.y)-cst)*idx;
-		Vertical = true;
+		else
+		{
+			Pos.x = (CurTileX+DeltaNextTileX)*32;
+			Pos.y = NextPosY;
+			CurTileX += DeltaTileX;
+			NextPosY = (32*(CurTileX+DeltaNextTileX)*(Pos1.y-Pos0.y)-DetPos)*InvDeltaX;
+			Vertical = true;
+		}
 	}
-	if(IsTileSolid(i*32,j*32))
+	if(IsTileSolid(CurTileX*32,CurTileY*32))
 	{
 		if(pOutCollision)
 			*pOutCollision = Pos;
@@ -162,7 +153,7 @@ int CCollision::FastIntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec
 				Dir *= 0.5f / absolute(Dir.y) + 1.f;
 			*pOutBeforeCollision = Pos - Dir;
 		}
-		return GetTile(i*32,j*32);
+		return GetTile(CurTileX*32,CurTileY*32);
 	}
 	if(pOutCollision)
 		*pOutCollision = Pos1;
