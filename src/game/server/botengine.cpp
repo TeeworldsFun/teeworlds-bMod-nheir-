@@ -839,8 +839,6 @@ int CBotEngine::FastIntersectLine(int Id1, int Id2)
 void CBotEngine::GetPath(vec2 VStart, vec2 VEnd, CPath *pPath)
 {
 	pPath->m_Size = m_Graph.GetPath(GetClosestVertex(VStart),GetClosestVertex(VEnd),pPath->m_pVertices+1);
-	if(!pPath->m_Size)
-		return;
 	pPath->m_pVertices[0] = VStart;
 	pPath->m_pVertices[pPath->m_Size+1] = VEnd;
 	pPath->m_Size = pPath->m_Size+2;

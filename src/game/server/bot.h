@@ -72,9 +72,10 @@ protected:
 			TARGET_WEAPON_SHOTGUN,
 			TARGET_WEAPON_GRENADE,
 			TARGET_POWERUP_NINJA,
-			TARGET_WEAPON_RIFLE,
+			TARGET_WEAPON_LASER,
 			TARGET_AIR
-		} m_Type;
+		};
+		int m_Type;
 		int m_PlayerCID;
 		bool m_NeedUpdate;
 	} m_ComputeTarget;
@@ -82,11 +83,20 @@ protected:
 	CNetObj_PlayerInput m_InputData;
 	CNetObj_PlayerInput m_LastData;
 
+	int m_Move;
+	vec2 m_Direction;
+	int m_Jump;
+	int m_Attack;
+	int m_Hook;
+
 	int GetTarget();
 	void UpdateTarget();
 	int GetTeam(int ClientID);
 	int IsFalling();
 	bool IsGrounded();
+
+	bool NeedPickup(int Type);
+	bool FindPickup(int Type, vec2 *pPos, float Radius = 1000);
 
 	void HandleWeapon(bool SeeTarget);
 	void HandleHook(bool SeeTarget);
@@ -94,6 +104,8 @@ protected:
 	void MakeChoice(bool UseTarget);
 
 	int GetTile(int x, int y) { return BotEngine()->GetTile(x/32,y/32);}
+
+	vec2 ClosestCharacter();
 
 public:
 	CBot(class CBotEngine *m_pBotEngine, CPlayer *pPlayer);
@@ -104,10 +116,11 @@ public:
 
 	int GetID() { return m_SnapID; }
 	void Snap(int SnappingClient);
+	void Tick();
 
 	virtual void OnReset();
 
-	CNetObj_PlayerInput GetInputData();
+	CNetObj_PlayerInput GetInputData() { Tick(); return m_InputData; };
 	CNetObj_PlayerInput GetLastInputData() { return m_LastData; }
 };
 

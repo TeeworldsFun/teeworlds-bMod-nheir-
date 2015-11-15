@@ -17,6 +17,9 @@ public:
 	virtual void TickPaused();
 	virtual void Snap(int SnappingClient);
 
+	int GetType() { return m_Type; }
+	bool IsSpawned() { return m_SpawnTick == -1; }
+
 private:
 	int m_Type;
 	int m_SpawnTick;

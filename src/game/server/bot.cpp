@@ -10,6 +10,7 @@
 #include "player.h"
 #include "entities/character.h"
 #include "entities/flag.h"
+#include "entities/pickup.h"
 
 CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 {
@@ -39,22 +40,35 @@ void CBot::OnReset()
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
 }
 
+vec2 CBot::ClosestCharacter()
+{
+	float d = -1;
+	vec2 Pos = vec2(0,0);
+	for(int c = 0; c < MAX_CLIENTS; c++)
+		if(c != m_pPlayer->GetCID() && GameServer()->m_apPlayers[c] && GameServer()->m_apPlayers[c]->GetCharacter() && (d < -1 || d > distance(m_pPlayer->GetCharacter()->GetPos(),GameServer()->m_apPlayers[c]->GetCharacter()->GetPos())))
+		{
+			d = distance(m_pPlayer->GetCharacter()->GetPos(),GameServer()->m_apPlayers[c]->GetCharacter()->GetPos());
+			Pos = GameServer()->m_apPlayers[c]->GetCharacter()->GetPos();
+		}
+	return Pos;
+}
+
 void CBot::UpdateTarget()
 {
-	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;
+	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;// || !m_pPath->m_Size;
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID] && GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
 
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_AIR)
 	{
-		int dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
+		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
 		if(dist < 60)
 			FindNewTarget = true;
 	}
 	if(m_ComputeTarget.m_Type > CTarget::TARGET_PLAYER)
 	{
-		int dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
-		if(dist < 20)
+		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
+		if(dist < 28)
 			FindNewTarget = true;
 	}
 
@@ -103,6 +117,16 @@ void CBot::UpdateTarget()
 				}
 			}
 		}
+		float Radius = distance(m_pPlayer->GetCharacter()->GetPos(), ClosestCharacter());
+		int Pickup[5] = { CTarget::TARGET_ARMOR, CTarget::TARGET_HEALTH, CTarget::TARGET_WEAPON_SHOTGUN, CTarget::TARGET_WEAPON_GRENADE, CTarget::TARGET_WEAPON_LASER};
+		for(int i = 0 ; i < 5 ; i++)
+		{
+			if(NeedPickup(Pickup[i]) && FindPickup(Pickup[i], &m_ComputeTarget.m_Pos, Radius))
+			{
+				m_ComputeTarget.m_Type = Pickup[i];
+				return;
+			}
+		}
 		if(random_int()&1)
 		{
 			int Team = m_pPlayer->GetTeam();
@@ -143,19 +167,75 @@ void CBot::UpdateTarget()
 	}
 }
 
+bool CBot::NeedPickup(int Type)
+{
+	switch(Type)
+	{
+	case CTarget::TARGET_HEALTH:
+		return m_pPlayer->GetCharacter()->GetHealth() < 5;
+	case CTarget::TARGET_ARMOR:
+		return m_pPlayer->GetCharacter()->GetArmor() < 5;
+	case CTarget::TARGET_WEAPON_SHOTGUN:
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_SHOTGUN) < 5;
+	case CTarget::TARGET_WEAPON_GRENADE:
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_GRENADE) < 5;
+	case CTarget::TARGET_WEAPON_LASER:
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_LASER) < 5;
+	}
+	return false;
+}
+
+bool CBot::FindPickup(int Type, vec2 *pPos, float Radius)
+{
+	switch(Type)
+	{
+		case CTarget::TARGET_ARMOR:
+			Type = PICKUP_ARMOR;
+			break;
+		case CTarget::TARGET_HEALTH:
+			Type = PICKUP_HEALTH;
+			break;
+		case CTarget::TARGET_WEAPON_SHOTGUN:
+			Type = PICKUP_SHOTGUN;
+			break;
+		case CTarget::TARGET_WEAPON_GRENADE:
+			Type = PICKUP_GRENADE;
+			break;
+		case CTarget::TARGET_WEAPON_LASER:
+			Type = PICKUP_LASER;
+			break;
+	}
+	CEntity *pEnt = GameServer()->m_World.FindFirst(CGameWorld::ENTTYPE_PICKUP);
+	bool Found = false;
+	for(;	pEnt; pEnt = pEnt->TypeNext())
+	{
+		CPickup *pPickup = (CPickup *) pEnt;
+		if(pPickup->GetType() == Type && pPickup->IsSpawned() && Radius > distance(pPickup->GetPos(),m_pPlayer->GetCharacter()->GetPos()) )
+		{
+			*pPos = pPickup->GetPos();
+			Radius = distance(pPickup->GetPos(),m_pPlayer->GetCharacter()->GetPos());
+			Found = true;
+		}
+	}
+	return Found;
+}
+
 bool CBot::IsGrounded()
 {
 	return m_pPlayer->GetCharacter()->IsGrounded();
 }
 
-CNetObj_PlayerInput CBot::GetInputData()
+void CBot::Tick()
 {
 	if(!m_pPlayer->GetCharacter())
-		return m_InputData;
+		return;
 	const CCharacterCore *pMe = m_pPlayer->GetCharacter()->GetCore();
 	int Team = m_pPlayer->GetTeam();
 
 	UpdateTarget();
+
+	if(m_ComputeTarget.m_NeedUpdate)
+		dbg_msg("bot", "new target pos=(%f,%f) type=%d", m_ComputeTarget.m_Pos.x, m_ComputeTarget.m_Pos.y, m_ComputeTarget.m_Type);
 
 	UpdateEdge();
 
@@ -178,7 +258,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 
 	m_RealTarget = m_Target + Pos;
 
-	if(g_Config.m_SvBotAllowFire && m_pPlayer->GetCharacter()->m_ReloadTimer <= 0)
+	if(g_Config.m_SvBotAllowFire && m_pPlayer->GetCharacter()->CanFire())
 		HandleWeapon(InSight);
 
 	HandleHook(InSight);
@@ -212,7 +292,7 @@ CNetObj_PlayerInput CBot::GetInputData()
 		m_InputData.m_Hook = 0;
 
 	m_LastData = m_InputData;
-	return m_InputData;
+	return;
 }
 
 void CBot::HandleHook(bool SeeTarget)
@@ -351,7 +431,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 		{
 			Weapon = WEAPON_HAMMER;
 		}
-		else if(pMe->m_aWeapons[WEAPON_LASER].m_Ammo != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectSegment(Pos, apTarget[c]->m_Pos, 0, 0))
+		else if(pMe->GetAmmoCount(WEAPON_LASER) != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectSegment(Pos, apTarget[c]->m_Pos, 0, 0))
 	  {
 	    Weapon = WEAPON_LASER;
 	  }
@@ -369,7 +449,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 		int Weapons[] = {WEAPON_GRENADE, WEAPON_SHOTGUN, WEAPON_GUN};
 		for(int j = 0 ; j < 3 ; j++)
 		{
-			if(!pMe->m_aWeapons[Weapons[j]].m_Ammo)
+			if(!pMe->GetAmmoCount(Weapons[j]))
 				continue;
 			float Curvature, Speed, DTime;
 			switch(Weapons[j])
@@ -450,7 +530,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 		if(m_InputData.m_Fire)
 			m_Target = Target;
 	}
-	else if(pMe->m_aWeapons[WEAPON_GUN].m_Ammo != 10)
+	else if(pMe->GetAmmoCount(WEAPON_GUN) != 10)
 		m_InputData.m_WantedWeapon = WEAPON_GUN+1;
 
 
@@ -466,11 +546,6 @@ void CBot::UpdateEdge()
 	{
 		dbg_msg("bot", "no edge");
 		return;
-	}
-	if(m_pPath->m_Size)
-	{
-		if(distance(m_pPath->m_pVertices[m_pPath->m_Size-1], Pos) < 60)
-			m_ComputeTarget.m_NeedUpdate = true;
 	}
 	if(m_ComputeTarget.m_NeedUpdate)
 	{
@@ -527,39 +602,39 @@ void CBot::MakeChoice(bool UseTarget)
 	if(TempChar.m_Input.m_Direction < 0)
 		Flags |= BFLAG_LEFT;
 
-	if(CurTile & BTILE_SAFE && NextTile & BTILE_HOLE && Grounded)
+	if(m_Target.y < 0)
 	{
-		if(m_Target.y < 0)
+		if(CurTile & BTILE_SAFE && NextTile & BTILE_HOLE && (Grounded || TempChar.m_Vel.y > 0))
 			Flags |= BFLAG_JUMP;
-	}
-	if(CurTile & BTILE_SAFE && NextTile & BTILE_SAFE)
-	{
-		static bool tried = false;
-		if(absolute(CurPos.x - NextPos.x) < 1.0f && TempChar.m_Input.m_Direction)
+		if(CurTile & BTILE_SAFE && NextTile & BTILE_SAFE)
 		{
-			if(Grounded)
+			static bool tried = false;
+			if(absolute(CurPos.x - NextPos.x) < 1.0f && TempChar.m_Input.m_Direction)
 			{
-				Flags |= BFLAG_JUMP;
-				tried = true;
+				if(Grounded)
+				{
+					Flags |= BFLAG_JUMP;
+					tried = true;
+				}
+				else if(tried && !(TempChar.m_Jumped) && TempChar.m_Vel.y > 0)
+					Flags |= BFLAG_JUMP;
+				else if(tried && TempChar.m_Jumped & 2 && TempChar.m_Vel.y > 0)
+					Flags ^= BFLAG_RIGHT | BFLAG_LEFT;
 			}
-			else if(tried && !(TempChar.m_Jumped) && TempChar.m_Vel.y > 0)
-				Flags |= BFLAG_JUMP;
-			else if(tried && TempChar.m_Jumped & 2 && TempChar.m_Vel.y > 0)
-				Flags ^= BFLAG_RIGHT | BFLAG_LEFT;
+			else
+				tried = false;
+			// if(m_Target.y < 0 && TempChar.m_Vel.y > 1.f && !(TempChar.m_Jumped) && !Grounded)
+			// 	Flags |= BFLAG_JUMP;
 		}
-		else
-			tried = false;
-		// if(m_Target.y < 0 && TempChar.m_Vel.y > 1.f && !(TempChar.m_Jumped) && !Grounded)
-		// 	Flags |= BFLAG_JUMP;
-	}
 
-	if(!(pMe->m_Jumped))
-	{
-		vec2 Vel(pMe->m_Vel.x, min(pMe->m_Vel.y, 0.0f));
-		if(Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0) && (m_Target.y < 0))
-			Flags |= BFLAG_JUMP;
-		if(m_Target.y < 0 && absolute(m_Target.x) < 28.f && pMe->m_Vel.y > -1.f)
-			Flags |= BFLAG_JUMP;
+		if(!(pMe->m_Jumped))
+		{
+			vec2 Vel(pMe->m_Vel.x, min(pMe->m_Vel.y, 0.0f));
+			if(Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->IntersectSegment(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0))
+				Flags |= BFLAG_JUMP;
+			if(absolute(m_Target.x) < 28.f && pMe->m_Vel.y > -1.f)
+				Flags |= BFLAG_JUMP;
+		}
 	}
 	// if(Flags & BFLAG_JUMP || pMe->m_Vel.y < 0)
 	// 	m_InputData.m_WantedWeapon = WEAPON_GRENADE +1;
