@@ -93,6 +93,84 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 	return 0;
 }
 
+int CCollision::FastIntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
+{
+	int i_a = round_to_int(Pos0.x)/32;
+	int j_a = round_to_int(Pos0.y)/32;
+	int i_b = round_to_int(Pos1.x)/32;
+	int j_b = round_to_int(Pos1.y)/32;
+
+	float idx = (i_a == i_b) ? 1.f : 1.f/(Pos1.x-Pos0.x);
+	float idy = (j_a == j_b) ? 1.f : 1.f/(Pos1.y-Pos0.y);
+
+	float cst = Pos0.x * Pos1.y - Pos0.y * Pos1.x;
+
+	int i = i_a, j = j_a;
+	int di = (i_a <= i_b) ? 1 : -1;
+	int dj = (j_a <= j_b) ? 1 : -1;
+	int ci = (i_a <= i_b) ? 1 : 0;
+	int cj = (j_a <= j_b) ? 1 : 0;
+
+	vec2 Pos = Pos0;
+
+	bool Vertical = false;
+
+	float x = (32*(j+cj)*(Pos1.x-Pos0.x)+cst)*idy;
+	float y = (32*(i+ci)*(Pos1.y-Pos0.y)-cst)*idx;
+	while(i != i_b || j != j_b)
+	{
+		if(IsTileSolid(i*32,j*32))
+		{
+			if(pOutCollision)
+				*pOutCollision = Pos;
+			if(pOutBeforeCollision)
+			{
+				vec2 Dir = normalize(Pos1-Pos0);
+				if(Vertical)
+					Dir *= 0.5f / absolute(Dir.x) + 1.f;
+				else
+					Dir *= 0.5f / absolute(Dir.y) + 1.f;
+				*pOutBeforeCollision = Pos - Dir;
+			}
+			return GetTile(i*32,j*32);
+		}
+		if(j != j_b && (i == i_b || y*dj > 32*(j+cj)*dj))
+		{
+			Pos.x = x;
+			Pos.y = (j+cj)*32;
+			j += dj;
+			x = (32*(j+cj)*(Pos1.x-Pos0.x)+cst)*idy;
+			Vertical = false;
+			continue;
+		}
+		Pos.x = (i+ci)*32;
+		Pos.y = y;
+		i += di;
+		y = (32*(i+ci)*(Pos1.y-Pos0.y)-cst)*idx;
+		Vertical = true;
+	}
+	if(IsTileSolid(i*32,j*32))
+	{
+		if(pOutCollision)
+			*pOutCollision = Pos;
+		if(pOutBeforeCollision)
+		{
+			vec2 Dir = normalize(Pos1-Pos0);
+			if(Vertical)
+				Dir *= 0.5f / absolute(Dir.x) + 1.f;
+			else
+				Dir *= 0.5f / absolute(Dir.y) + 1.f;
+			*pOutBeforeCollision = Pos - Dir;
+		}
+		return GetTile(i*32,j*32);
+	}
+	if(pOutCollision)
+		*pOutCollision = Pos1;
+	if(pOutBeforeCollision)
+		*pOutBeforeCollision = Pos1;
+	return 0;
+}
+
 // TODO: OPT: rewrite this smarter!
 void CCollision::MovePoint(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces) const
 {
