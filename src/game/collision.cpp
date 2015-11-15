@@ -99,15 +99,14 @@ int CCollision::FastIntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec
 	const int Tile1X = round_to_int(Pos1.x)/32;
 	const int Tile1Y = round_to_int(Pos1.y)/32;
 
-	const float InvDeltaX = (Tile0X == Tile1X) ? 1.f : 1.f/(Pos1.x-Pos0.x);
-	const float InvDeltaY = (Tile0Y == Tile1Y) ? 1.f : 1.f/(Pos1.y-Pos0.y);
+	const float Ratio = (Tile0X == Tile1X) ? 1.f : (Pos1.y - Pos0.y) / (Pos1.x-Pos0.x);
 
 	const float DetPos = Pos0.x * Pos1.y - Pos0.y * Pos1.x;
 
 	const int DeltaTileX = (Tile0X <= Tile1X) ? 1 : -1;
 	const int DeltaTileY = (Tile0Y <= Tile1Y) ? 1 : -1;
-	const int DeltaNextTileX = (Tile0X <= Tile1X) ? 1 : 0;
-	const int DeltaNextTileY = (Tile0Y <= Tile1Y) ? 1 : 0;
+
+	const float DeltaError = DeltaTileY * DeltaTileX * Ratio;
 
 	int CurTileX = Tile0X;
 	int CurTileY = Tile0Y;
@@ -115,32 +114,48 @@ int CCollision::FastIntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec
 
 	bool Vertical = false;
 
-	float NextPosX = (32*(CurTileY+DeltaNextTileY)*(Pos1.x-Pos0.x)+DetPos)*InvDeltaY;
-	float NextPosY = (32*(CurTileX+DeltaNextTileX)*(Pos1.y-Pos0.y)-DetPos)*InvDeltaX;
+	float Error = 0;
+	if(Tile0Y != Tile1Y && Tile0X != Tile1X)
+	{
+		Error = (CurTileX * Ratio - CurTileY - DetPos / (32*(Pos1.x-Pos0.x))) * DeltaTileY;
+		if(Tile0X < Tile1X)
+			Error += Ratio * DeltaTileY;
+		if(Tile0Y < Tile1Y)
+			Error -= DeltaTileY;
+	}
 
 	while(CurTileX != Tile1X || CurTileY != Tile1Y)
 	{
 		if(IsTileSolid(CurTileX*32,CurTileY*32))
 			break;
-		if(CurTileY != Tile1Y && (CurTileX == Tile1X || NextPosY*DeltaTileY > 32*(CurTileY+DeltaNextTileY)*DeltaTileY))
+		if(CurTileY != Tile1Y && (CurTileX == Tile1X || Error > 0))
 		{
-			Pos.x = NextPosX;
-			Pos.y = (CurTileY+DeltaNextTileY)*32;
 			CurTileY += DeltaTileY;
-			NextPosX = (32*(CurTileY+DeltaNextTileY)*(Pos1.x-Pos0.x)+DetPos)*InvDeltaY;
+			Error -= 1;
 			Vertical = false;
 		}
 		else
 		{
-			Pos.x = (CurTileX+DeltaNextTileX)*32;
-			Pos.y = NextPosY;
 			CurTileX += DeltaTileX;
-			NextPosY = (32*(CurTileX+DeltaNextTileX)*(Pos1.y-Pos0.y)-DetPos)*InvDeltaX;
+			Error += DeltaError;
 			Vertical = true;
 		}
 	}
 	if(IsTileSolid(CurTileX*32,CurTileY*32))
 	{
+		if(CurTileX != Tile0X || CurTileY != Tile0Y)
+		{
+			if(Vertical)
+			{
+				Pos.x = 32 * (CurTileX + ((Tile0X < Tile1X) ? 0 : 1));
+				Pos.y = (Pos.x * (Pos1.y - Pos0.y) - DetPos) / (Pos1.x - Pos0.x);
+			}
+			else
+			{
+				Pos.y = 32 * (CurTileY + ((Tile0Y < Tile1Y) ? 0 : 1));
+				Pos.x = (Pos.y * (Pos1.x - Pos0.x) + DetPos) / (Pos1.y - Pos0.y);
+			}
+		}
 		if(pOutCollision)
 			*pOutCollision = Pos;
 		if(pOutBeforeCollision)
