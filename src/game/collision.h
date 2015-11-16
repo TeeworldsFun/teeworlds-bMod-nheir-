@@ -12,18 +12,8 @@ class CCollision
 	int m_Height;
 	class CLayers *m_pLayers;
 
-	struct CSegment {
-		bool m_IsVertical;
-		vec2 m_A;
-		vec2 m_B;
-	} *m_pSegments;
-	int m_SegmentCount;
-	int m_HSegmentCount;
-
 	bool IsTileSolid(int x, int y) const;
 	int GetTile(int x, int y) const;
-
-	void BuildSegments();
 
 public:
 	enum
@@ -34,7 +24,6 @@ public:
 	};
 
 	CCollision();
-	~CCollision();
 	void Init(class CLayers *pLayers);
 	bool CheckPoint(float x, float y) const { return IsTileSolid(round_to_int(x), round_to_int(y)); }
 	bool CheckPoint(vec2 Pos) const { return CheckPoint(Pos.x, Pos.y); }
@@ -42,12 +31,9 @@ public:
 	int GetWidth() const { return m_Width; };
 	int GetHeight() const { return m_Height; };
 	int IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const;
-	int IntersectSegment(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const;
 	void MovePoint(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces) const;
 	void MoveBox(vec2 *pInoutPos, vec2 *pInoutVel, vec2 Size, float Elasticity) const;
 	bool TestBox(vec2 Pos, vec2 Size) const;
-
-	static int SegmentComp(const void *a, const void *b);
 };
 
 #endif
