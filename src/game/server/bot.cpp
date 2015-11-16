@@ -159,7 +159,7 @@ void CBot::UpdateTarget()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
 	{
 		CPlayer *pPlayer = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID];
-		if(Collision()->IntersectLine(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
+		if(Collision()->FastIntersectLine(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
 		{
 			m_ComputeTarget.m_NeedUpdate = true;
 			m_ComputeTarget.m_Pos = pPlayer->GetCharacter()->GetPos();
@@ -249,7 +249,7 @@ void CBot::Tick()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
 	{
 		const CCharacterCore *pClosest = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()->GetCore();
-		InSight = !Collision()->IntersectLine(Pos, pClosest->m_Pos, 0, 0);
+		InSight = !Collision()->FastIntersectLine(Pos, pClosest->m_Pos, 0, 0);
 		m_Target = pClosest->m_Pos - Pos;
 		m_RealTarget = pClosest->m_Pos;
 	}
@@ -361,7 +361,7 @@ void CBot::HandleHook(bool SeeTarget)
 				vec2 dir = direction(a);
 				vec2 Pos = pMe->m_Pos+dir*Tuning()->m_HookLength;
 
-				if((Collision()->IntersectLine(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
+				if((Collision()->FastIntersectLine(pMe->m_Pos,Pos,&Pos,0) & (CCollision::COLFLAG_SOLID | CCollision::COLFLAG_NOHOOK)) == CCollision::COLFLAG_SOLID)
 				{
 					vec2 HookVel = dir*GameServer()->Tuning()->m_HookDragAccel;
 
@@ -431,7 +431,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 		{
 			Weapon = WEAPON_HAMMER;
 		}
-		else if(pMe->GetAmmoCount(WEAPON_LASER) != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->IntersectLine(Pos, apTarget[c]->m_Pos, 0, 0))
+		else if(pMe->GetAmmoCount(WEAPON_LASER) != 0 && ClosestRange < GameServer()->Tuning()->m_LaserReach && !Collision()->FastIntersectLine(Pos, apTarget[c]->m_Pos, 0, 0))
 	  {
 	    Weapon = WEAPON_LASER;
 	  }
@@ -497,8 +497,8 @@ void CBot::HandleWeapon(bool SeeTarget)
 					NextPos.x += dir.x*DTime;
 					NextPos.y += dir.y*DTime + Curvature*(DTime*DTime)*(2*k+1);
 					//dbg_msg("bot","projectile step dist=%f",distance(aProjectilePos[i], NextPos));
-					//aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
-					aIsDead[i] = Collision()->IntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
+					//aIsDead[i] = Collision()->FastIntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
+					aIsDead[i] = Collision()->FastIntersectLine(aProjectilePos[i], NextPos, &NextPos, 0);
 					for(int c = 0; c < Count; c++)
 					{
 						vec2 InterPos = closest_point_on_line(aProjectilePos[i],NextPos, aTargetPos[c]);
@@ -511,7 +511,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 				}
 				for(int c = 0; c < Count; c++)
 				{
-					Collision()->IntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
+					Collision()->FastIntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
 					aTargetVel[c].y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
 				}
 			}
@@ -630,7 +630,7 @@ void CBot::MakeChoice(bool UseTarget)
 		if(!(pMe->m_Jumped))
 		{
 			vec2 Vel(pMe->m_Vel.x, min(pMe->m_Vel.y, 0.0f));
-			if(Collision()->IntersectLine(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->IntersectLine(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0))
+			if(Collision()->FastIntersectLine(pMe->m_Pos,pMe->m_Pos+Vel*10.0f,0,0) && !Collision()->FastIntersectLine(pMe->m_Pos,pMe->m_Pos+(Vel-vec2(0,TempWorld.m_Tuning.m_AirJumpImpulse))*10.0f,0,0))
 				Flags |= BFLAG_JUMP;
 			if(absolute(m_Target.x) < 28.f && pMe->m_Vel.y > -1.f)
 				Flags |= BFLAG_JUMP;

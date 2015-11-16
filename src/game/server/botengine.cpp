@@ -933,7 +933,7 @@ int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 		{
 			vec2 VertexPos = pPath->m_pVertices[k];
 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;
-			if(!(GameServer()->Collision()->IntersectLine(Pos-W,VertexPos-W,0,0)) && !(GameServer()->Collision()->IntersectLine(Pos+W,VertexPos+W,0,0)))
+			if(!(GameServer()->Collision()->FastIntersectLine(Pos-W,VertexPos-W,0,0)) && !(GameServer()->Collision()->FastIntersectLine(Pos+W,VertexPos+W,0,0)))
 			//if(!(FastIntersectLine(ConvertFromIndex(Pos),ConvertFromIndex(VertexPos))))
 			{
 				if(pTarget)
