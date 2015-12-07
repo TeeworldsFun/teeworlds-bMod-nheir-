@@ -241,6 +241,8 @@ protected:
 	vec2 m_aFlagStandPos[2];
 	int m_aBotSnapID[MAX_CLIENTS];
 
+	class CBot *m_apBot[MAX_CLIENTS];
+
 public:
 	CBotEngine(class CGameContext *pGameServer);
 	~CBotEngine();
@@ -281,6 +283,10 @@ public:
 	void OnRelease();
 
 	int NetworkClipped(int SnappingClient, vec2 CheckPos);
+
+	void OnCharacterDeath(int Victim, int Killer, int Weapon);
+	void RegisterBot(int CID, class CBot *pBot);
+	void UnRegisterBot(int CID);
 
 	static int SegmentComp(const void *a, const void *b);
 };

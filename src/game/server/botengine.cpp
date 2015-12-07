@@ -5,6 +5,7 @@
 #include "gamecontext.h"
 
 #include "botengine.h"
+#include "bot.h"
 
 CGraph::CGraph()
 {
@@ -121,6 +122,7 @@ CBotEngine::CBotEngine(CGameContext *pGameServer)
 	m_pSegments = 0;
 	m_SegmentCount = 0;
 	mem_zero(m_aPaths,sizeof(m_aPaths));
+	mem_zero(m_apBot,sizeof(m_apBot));
 }
 
 void CBotEngine::Free()
@@ -993,6 +995,25 @@ vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 	}
 	return m_Graph.m_pVertices[i].m_Pos;
 }
+
+void CBotEngine::OnCharacterDeath(int Victim, int Killer, int Weapon)
+{
+	if(m_apBot[Victim])
+		m_apBot[Victim]->m_GenomeTick >>= 1;
+	if(m_apBot[Killer])
+		m_apBot[Killer]->m_GenomeTick <<= 1;
+}
+
+void CBotEngine::RegisterBot(int CID, CBot *pBot)
+{
+	m_apBot[CID] = pBot;
+}
+
+void CBotEngine::UnRegisterBot(int CID)
+{
+	m_apBot[CID] = 0;
+}
+
 
 int CBotEngine::NetworkClipped(int SnappingClient, vec2 CheckPos)
 {

@@ -6,6 +6,8 @@
 #include "gamecontext.h"
 #include "botengine.h"
 
+#include "ai/genetics.h"
+
 const char g_BotClan[12] = "Love";
 const char g_BotName[MAX_CLIENTS][16] = {
 	"Anna",
@@ -71,14 +73,20 @@ protected:
 			TARGET_HEALTH,
 			TARGET_WEAPON_SHOTGUN,
 			TARGET_WEAPON_GRENADE,
-			TARGET_POWERUP_NINJA,
+			//TARGET_POWERUP_NINJA,
 			TARGET_WEAPON_LASER,
-			TARGET_AIR
+			TARGET_AIR,
+			NUM_TARGETS
 		};
 		int m_Type;
 		int m_PlayerCID;
 		bool m_NeedUpdate;
 	} m_ComputeTarget;
+
+	class CGenetics m_Genetics;
+	int m_aTargetOrder[CTarget::NUM_TARGETS];
+
+	void UpdateTargetOrder();
 
 	CNetObj_PlayerInput m_InputData;
 	CNetObj_PlayerInput m_LastData;
@@ -110,6 +118,9 @@ protected:
 public:
 	CBot(class CBotEngine *m_pBotEngine, CPlayer *pPlayer);
 	~CBot();
+
+
+	int m_GenomeTick;
 
 	const char *GetName();
 	const char *GetClan() { return g_BotClan; }

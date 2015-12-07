@@ -73,6 +73,8 @@ void CPlayer::Tick()
 	{
 		delete m_pCharacter;
 		m_pCharacter = 0;
+		if(IsBot())
+			m_pBot->OnReset();
 	}
 
 	if(!GameServer()->m_pController->IsGamePaused())
@@ -284,9 +286,6 @@ void CPlayer::Respawn()
 	}
 
 	m_DeadSpecMode = false;
-
-	if(IsBot())
-		m_pBot->OnReset();
 
 	if(m_Team != TEAM_SPECTATORS)
 		m_Spawning = true;
