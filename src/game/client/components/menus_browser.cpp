@@ -34,7 +34,7 @@ CMenus::CColumn CMenus::ms_aCols[] = {
 CMenus::CBrowserFilter::CBrowserFilter(int Custom, const char* pName, IServerBrowser *pServerBrowser, int Filter, int Ping, int Country, const char* pGametype, const char* pServerAddress)
 : m_pServerBrowser(pServerBrowser)
 {
-	m_Extended = true;
+	m_Extended = false;
 	m_Custom = Custom;
 	str_copy(m_aName, pName, sizeof(m_aName));
 	//Todo: fix Filter
@@ -166,7 +166,7 @@ int CMenus::DoBrowserEntry(const void *pID, CUIRect *pRect, const CServerInfo *p
 	int ReturnValue = 0;
 	int Inside = UI()->MouseInside(pRect);
 
-	if(UI()->ActiveItem() == pID)
+	if(UI()->CheckActiveItem(pID))
 	{
 		if(!UI()->MouseButton(0))
 		{
@@ -442,7 +442,19 @@ bool CMenus::RenderFilterHeader(CUIRect View, int FilterIndex)
 	View.VSplitLeft(20.0f, &Button, &View);
 	Button.Margin(2.0f, &Button);
 	if(DoButton_SpriteClean(IMAGE_MENUICONS, pFilter->Extended() ? SPRITE_MENU_EXPANDED : SPRITE_MENU_COLLAPSED, &Button))
+	{
 		pFilter->Switch();
+		
+		// retract the other filters
+		if(pFilter->Extended())
+		{
+			for(int i = 0; i < m_lFilters.size(); ++i)
+			{
+				if(i != FilterIndex && m_lFilters[i].Extended())
+					m_lFilters[i].Switch();
+			}
+		}
+	}
 
 	// split buttons from label
 	View.VSplitLeft(Spacing, 0, &View);
@@ -452,6 +464,10 @@ bool CMenus::RenderFilterHeader(CUIRect View, int FilterIndex)
 	View.y += 2.0f;
 	UI()->DoLabel(&View, pFilter->Name(), ButtonHeight*ms_FontmodHeight*0.8f, CUI::ALIGN_LEFT);
 
+	View.VSplitRight(20.0f, &View, 0); // little space
+	char aBuf[64];
+	str_format(aBuf, sizeof(aBuf), Localize("%d servers, %d players"), pFilter->NumSortedServers(), pFilter->NumPlayers());
+	UI()->DoLabel(&View, aBuf, ButtonHeight*ms_FontmodHeight*0.8f, CUI::ALIGN_RIGHT);
 	/*if(pFilter->Custom() <= CBrowserFilter::FILTER_ALL)
 		UI()->DoLabel(&View, pFilter->Name(), 12.0f, CUI::ALIGN_LEFT);
 	else
@@ -510,10 +526,10 @@ bool CMenus::RenderFilterHeader(CUIRect View, int FilterIndex)
 	EditButtons.VSplitRight(Spacing, &EditButtons, 0);
 	EditButtons.VSplitRight(ButtonHeight, &EditButtons, &Button);
 	Button.Margin(2.0f, &Button);
-	if(FilterIndex < m_lFilters.size()-1)
+	if(FilterIndex > 1)
 	{
 		if(DoButton_SpriteClean(IMAGE_TOOLICONS, SPRITE_TOOL_UP_A, &Button))
-			Move(false, FilterIndex);
+			Move(true, FilterIndex);
 	}
 	else
 		DoIcon(IMAGE_TOOLICONS, SPRITE_TOOL_UP_B, &Button);
@@ -521,10 +537,10 @@ bool CMenus::RenderFilterHeader(CUIRect View, int FilterIndex)
 	EditButtons.VSplitRight(Spacing, &EditButtons, 0);
 	EditButtons.VSplitRight(ButtonHeight, &EditButtons, &Button);
 	Button.Margin(2.0f, &Button);
-	if(FilterIndex > 0)
+	if(FilterIndex > 0 && FilterIndex < m_lFilters.size()-1)
 	{
 		if(DoButton_SpriteClean(IMAGE_TOOLICONS, SPRITE_TOOL_DOWN_A, &Button))
-			Move(true, FilterIndex);
+			Move(false, FilterIndex);
 	}
 	else
 		DoIcon(IMAGE_TOOLICONS, SPRITE_TOOL_DOWN_B, &Button);
@@ -900,9 +916,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 			s_ScrollValue = (float)(m_ScrollOffset)/ScrollNum;
 			m_ScrollOffset = 0;
 		}
-		if(Input()->KeyPresses(KEY_MOUSE_WHEEL_UP) && UI()->MouseInside(&View))
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP) && UI()->MouseInside(&View))
 			s_ScrollValue -= 3.0f/ScrollNum;
-		if(Input()->KeyPresses(KEY_MOUSE_WHEEL_DOWN) && UI()->MouseInside(&View))
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN) && UI()->MouseInside(&View))
 			s_ScrollValue += 3.0f/ScrollNum;
 	}
 	else
@@ -912,86 +928,80 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 	int SelectedIndex = m_SelectedServer.m_Index;
 	if(SelectedFilter > -1)
 	{
-		for(int i = 0; i < m_NumInputEvents; i++)
+		int NewIndex = -1;
+		int NewFilter = SelectedFilter;
+		if(Input()->KeyPress(KEY_DOWN))
 		{
-			int NewIndex = -1;
-			int NewFilter = SelectedFilter;
-			if(m_aInputEvents[i].m_Flags&IInput::FLAG_PRESS)
+			NewIndex = SelectedIndex + 1;
+			if(NewIndex >= m_lFilters[SelectedFilter].NumSortedServers())
 			{
-				if(m_aInputEvents[i].m_Key == KEY_DOWN)
+				// try to move to next filter
+				for(int j = SelectedFilter+1; j < m_lFilters.size(); j++)
 				{
-					NewIndex = SelectedIndex + 1;
-					if(NewIndex >= m_lFilters[SelectedFilter].NumSortedServers())
+					CBrowserFilter *pFilter = &m_lFilters[j];
+					if(pFilter->Extended() && pFilter->NumSortedServers())
 					{
-						// try to move to next filter
-						for(int j = SelectedFilter+1; j < m_lFilters.size(); j++)
-						{
-							CBrowserFilter *pFilter = &m_lFilters[j];
-							if(pFilter->Extended() && pFilter->NumSortedServers())
-							{
-								NewFilter = j;
-								NewIndex = 0;
-								break;
-							}
-						}
-					}
-				}
-				else if(m_aInputEvents[i].m_Key == KEY_UP)
-				{
-					NewIndex = SelectedIndex - 1;
-					if(NewIndex < 0)
-					{
-						// try to move to prev filter
-						for(int j = SelectedFilter-1; j >= 0; j--)
-						{
-							CBrowserFilter *pFilter = &m_lFilters[j];
-							if(pFilter->Extended() && pFilter->NumSortedServers())
-							{
-								NewFilter = j;
-								NewIndex = pFilter->NumSortedServers()-1;
-								break;
-							}
-						}
+						NewFilter = j;
+						NewIndex = 0;
+						break;
 					}
 				}
 			}
-			if(NewIndex > -1 && NewIndex < m_lFilters[NewFilter].NumSortedServers())
+		}
+		else if(Input()->KeyPress(KEY_UP))
+		{
+			NewIndex = SelectedIndex - 1;
+			if(NewIndex < 0)
 			{
-				// get index depending on all filters
-				int TotalIndex = 0;
-				int Filter = 0;
-				while(Filter != NewFilter)
+				// try to move to prev filter
+				for(int j = SelectedFilter-1; j >= 0; j--)
 				{
-					CBrowserFilter *pFilter = &m_lFilters[Filter];
-					if(pFilter->Extended())
-						TotalIndex += m_lFilters[Filter].NumSortedServers();
-					Filter++;
-				}
-				TotalIndex += NewIndex+1;
-
-				//scroll
-				float IndexY = View.y - s_ScrollValue*ScrollNum*ms_aCols[0].m_Rect.h + TotalIndex*ms_aCols[0].m_Rect.h + Filter*ms_aCols[0].m_Rect.h + Filter*20.0f;
-				int Scroll = View.y > IndexY ? -1 : View.y+View.h < IndexY+ms_aCols[0].m_Rect.h ? 1 : 0;
-				if(Scroll)
-				{
-					if(Scroll < 0)
+					CBrowserFilter *pFilter = &m_lFilters[j];
+					if(pFilter->Extended() && pFilter->NumSortedServers())
 					{
-						int NumScrolls = (View.y-IndexY+ms_aCols[0].m_Rect.h-1.0f)/ms_aCols[0].m_Rect.h;
-						s_ScrollValue -= (1.0f/ScrollNum)*NumScrolls;
-					}
-					else
-					{
-						int NumScrolls = (IndexY+ms_aCols[0].m_Rect.h-(View.y+View.h)+ms_aCols[0].m_Rect.h-1.0f)/ms_aCols[0].m_Rect.h;
-						s_ScrollValue += (1.0f/ScrollNum)*NumScrolls;
+						NewFilter = j;
+						NewIndex = pFilter->NumSortedServers()-1;
+						break;
 					}
 				}
-
-				m_SelectedServer.m_Filter = NewFilter;
-				m_SelectedServer.m_Index = NewIndex;
-
-				const CServerInfo *pItem = ServerBrowser()->SortedGet(NewFilter, NewIndex);
-				str_copy(g_Config.m_UiServerAddress, pItem->m_aAddress, sizeof(g_Config.m_UiServerAddress));
 			}
+		}
+		if(NewIndex > -1 && NewIndex < m_lFilters[NewFilter].NumSortedServers())
+		{
+			// get index depending on all filters
+			int TotalIndex = 0;
+			int Filter = 0;
+			while(Filter != NewFilter)
+			{
+				CBrowserFilter *pFilter = &m_lFilters[Filter];
+				if(pFilter->Extended())
+					TotalIndex += m_lFilters[Filter].NumSortedServers();
+				Filter++;
+			}
+			TotalIndex += NewIndex+1;
+
+			//scroll
+			float IndexY = View.y - s_ScrollValue*ScrollNum*ms_aCols[0].m_Rect.h + TotalIndex*ms_aCols[0].m_Rect.h + Filter*ms_aCols[0].m_Rect.h + Filter*20.0f;
+			int Scroll = View.y > IndexY ? -1 : View.y+View.h < IndexY+ms_aCols[0].m_Rect.h ? 1 : 0;
+			if(Scroll)
+			{
+				if(Scroll < 0)
+				{
+					int NumScrolls = (View.y-IndexY+ms_aCols[0].m_Rect.h-1.0f)/ms_aCols[0].m_Rect.h;
+					s_ScrollValue -= (1.0f/ScrollNum)*NumScrolls;
+				}
+				else
+				{
+					int NumScrolls = (IndexY+ms_aCols[0].m_Rect.h-(View.y+View.h)+ms_aCols[0].m_Rect.h-1.0f)/ms_aCols[0].m_Rect.h;
+					s_ScrollValue += (1.0f/ScrollNum)*NumScrolls;
+				}
+			}
+
+			m_SelectedServer.m_Filter = NewFilter;
+			m_SelectedServer.m_Index = NewIndex;
+
+			const CServerInfo *pItem = ServerBrowser()->SortedGet(NewFilter, NewIndex);
+			str_copy(g_Config.m_UiServerAddress, pItem->m_aAddress, sizeof(g_Config.m_UiServerAddress));
 		}
 	}
 
@@ -1012,10 +1022,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 	for(int s = 0; s < m_lFilters.size(); s++)
 	{
 		CBrowserFilter *pFilter = &m_lFilters[s];
-
-		// dont do anything if the filter is empty
-		if(!pFilter->NumSortedServers())
-			continue;
 
 		// filter header
 		CUIRect Row;
@@ -1060,7 +1066,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 				else
 				{
 					// reset active item, if not visible
-					if(UI()->ActiveItem() == pItem)
+					if(UI()->CheckActiveItem(pItem))
 						UI()->SetActiveItem(0);
 
 					// don't render invisible items
@@ -1080,7 +1086,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 		}
 
 		if(s < m_lFilters.size()-1)
-			View.HSplitTop(ms_ListheaderHeight, &Row, &View);
+			View.HSplitTop(SpacingH, &Row, &View);
 	}
 
 	UI()->ClipDisable();
@@ -1593,7 +1599,7 @@ void CMenus::RenderServerbrowserBottomBox(CUIRect MainView)
 	MainView.HSplitTop(25.0f, &MainView, 0);
 	MainView.VSplitLeft(ButtonWidth, &Button, &MainView);
 	static int s_RefreshButton=0;
-	if(DoButton_Menu(&s_RefreshButton, Localize("Refresh"), 0, &Button))
+	if(DoButton_Menu(&s_RefreshButton, Localize("Refresh"), 0, &Button) || (Input()->KeyPress(KEY_R) && (Input()->KeyIsPressed(KEY_LCTRL) || Input()->KeyIsPressed(KEY_RCTRL))))
 	{
 		if(m_MenuPage == PAGE_INTERNET)
 			ServerBrowser()->Refresh(IServerBrowser::REFRESHFLAG_INTERNET);
@@ -1655,6 +1661,7 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	float Spacing = 3.0f;
 	float ButtonWidth = (MainView.w/6.0f)-(Spacing*5.0)/6.0f;
 
+	MainView.VSplitRight(ButtonWidth+Spacing, &MainView, 0);
 	MainView.HSplitBottom(60.0f, 0, &BottomBox);
 	BottomBox.VSplitRight(ButtonWidth*2.0f+Spacing, 0, &BottomBox);
 

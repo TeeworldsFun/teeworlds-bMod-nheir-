@@ -13,27 +13,16 @@ class CInput : public IEngineInput
 	int64 m_ReleaseDelta;
 
 	void AddEvent(char *pText, int Key, int Flags);
-	void ClearEvents()
-	{
-		IInput::ClearEvents();
-		m_InputDispatched = true;
-	}
+	void Clear();
+	bool IsEventValid(CEvent *pEvent) const { return pEvent->m_InputCount == m_InputCounter; };
 
 	//quick access to input
-	struct
-	{
-		unsigned char m_Presses;
-		unsigned char m_Releases;
-	} m_aInputCount[2][g_MaxKeys];	// tw-KEY
-
-	unsigned char m_aInputState[2][g_MaxKeys];	// SDL_SCANCODE
-	int m_InputCurrent;
-	bool m_InputDispatched;
+	unsigned short m_aInputCount[g_MaxKeys];	// tw-KEY
+	unsigned char m_aInputState[g_MaxKeys];	// SDL_SCANCODE
+	int m_InputCounter;
 
 	void ClearKeyStates();
-	int KeyState(int Key) const;
-	int KeyStateOld(int Key) const;
-	int KeyWasPressed(int Key) const { return KeyStateOld(Key); }
+	bool KeyState(int Key) const;
 
 	IEngineGraphics *Graphics() { return m_pGraphics; }
 
@@ -42,10 +31,8 @@ public:
 
 	virtual void Init();
 
-	int KeyPressed(int Key) const { return KeyState(Key); }
-	int KeyReleases(int Key) const { return m_aInputCount[m_InputCurrent][Key].m_Releases; }
-	int KeyPresses(int Key) const { return m_aInputCount[m_InputCurrent][Key].m_Presses; }
-	int KeyDown(int Key) const { return KeyPressed(Key)&&!KeyWasPressed(Key); }
+	bool KeyIsPressed(int Key) const { return KeyState(Key); }
+	bool KeyPress(int Key, bool CheckCounter) const { return CheckCounter ? (m_aInputCount[Key] == m_InputCounter) : m_aInputCount[Key]; }
 
 	virtual void MouseRelative(float *x, float *y);
 	virtual void MouseModeAbsolute();

@@ -212,7 +212,7 @@ function GenerateWindowsSettings(settings, conf, target_arch, compiler)
 			print("Cross compiling is unsupported on Windows.")
 			os.exit(1)
 		end
-		settings.cc.flags:Add("/wd4244")
+		settings.cc.flags:Add("/wd4244", "/wd4577")
 	elseif compiler == "gcc" or config.compiler.driver == "clang" then
 		if target_arch ~= "x86" and target_arch ~= "x86_64" then
 			print("Unknown Architecture '" .. arch .. "'. Supported: x86, x86_64")
@@ -409,10 +409,10 @@ function GenerateSettings(conf, arch, builddir, compiler)
 	elseif family == "unix" then
 		if platform == "macosx" then
 			GenerateMacOSXSettings(settings, conf, arch)
-		elseif platform == "linux" then
-			GenerateLinuxSettings(settings, conf, arch)
 		elseif platform == "solaris" then
 			GenerateSolarisSettings(settings, conf, arch)
+		else -- Linux, BSD
+			GenerateLinuxSettings(settings, conf, arch)
 		end
 	end
 

@@ -52,7 +52,7 @@ void CMenus::DoPopupMenu()
 		bool Inside = UI()->MouseInside(&s_Popups[i].m_Rect);
 		UI()->SetHotItem(&s_Popups[i].m_pId);
 
-		if(UI()->ActiveItem() == &s_Popups[i].m_pId)
+		if(UI()->CheckActiveItem(&s_Popups[i].m_pId))
 		{
 			if(!UI()->MouseButton(0))
 			{
@@ -80,7 +80,7 @@ void CMenus::DoPopupMenu()
 		if(s_Popups[i].m_pfnFunc(this, r))
 			g_NumPopups--;
 
-		if(Input()->KeyDown(KEY_ESCAPE))
+		if(Input()->KeyPress(KEY_ESCAPE))
 			g_NumPopups--;
 	}
 }

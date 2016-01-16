@@ -169,10 +169,10 @@ void CPlayers::RenderHook(
 		RenderTools()->SelectSprite(SPRITE_HOOK_CHAIN);
 		IGraphics::CQuadItem Array[1024];
 		int i = 0;
-		for(float f = 24; f < d && i < 1024; f += 24, i++)
+		for(float f = 16; f < d && i < 1024; f += 16, i++)
 		{
 			vec2 p = HookPos + Dir*f;
-			Array[i] = IGraphics::CQuadItem(p.x, p.y,24,16);
+			Array[i] = IGraphics::CQuadItem(p.x, p.y,16,16);
 		}
 
 		Graphics()->QuadsDraw(Array, i);
@@ -204,6 +204,10 @@ void CPlayers::RenderPlayer(
 
 	float IntraTick = Client()->IntraGameTick();
 
+	if(Prev.m_Angle < pi*-128 && Player.m_Angle > pi*128)
+		Prev.m_Angle += 2*pi*256;
+	else if(Prev.m_Angle > pi*128 && Player.m_Angle < pi*-128)
+		Player.m_Angle += 2*pi*256;
 	float Angle = mix((float)Prev.m_Angle, (float)Player.m_Angle, IntraTick)/256.0f;
 
 	//float angle = 0;
