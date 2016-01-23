@@ -309,7 +309,7 @@ void CBotEngine::GenerateSegments()
 	{
 		bool right = false;
 		bool left = false;
-		for(int j = 1; j < m_Height-1; j++)
+		for(int j = 0; j < m_Height; j++)
 		{
 			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
 				left = true;
@@ -336,7 +336,7 @@ void CBotEngine::GenerateSegments()
 	{
 		bool up = false;
 		bool down = false;
-		for(int i = 1; i < m_Width-1; i++)
+		for(int i = 0; i < m_Width; i++)
 		{
 			if(up && ((m_pGrid[i+j*m_Width] & GTILE_MASK) <= GTILE_AIR || (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) > GTILE_AIR))
 			{
