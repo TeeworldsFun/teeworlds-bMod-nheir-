@@ -9,7 +9,7 @@
 
 CGameControllerTDM::CGameControllerTDM(class CGameContext *pGameServer) : IGameController(pGameServer)
 {
-	m_pGameType = "bTDM";
+	m_pGameType = "BotTDM";
 	m_GameFlags = GAMEFLAG_TEAMS;
 }
 

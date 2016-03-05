@@ -9,7 +9,7 @@
 
 CGameControllerSUR::CGameControllerSUR(CGameContext *pGameServer) : IGameController(pGameServer)
 {
-	m_pGameType = "bSUR";
+	m_pGameType = "BotSUR";
 	m_GameFlags = GAMEFLAG_TEAMS|GAMEFLAG_SURVIVAL;
 }
 

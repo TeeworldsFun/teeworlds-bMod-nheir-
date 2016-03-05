@@ -9,7 +9,7 @@
 
 CGameControllerLMS::CGameControllerLMS(CGameContext *pGameServer) : IGameController(pGameServer)
 {
-	m_pGameType = "bLMS";
+	m_pGameType = "BotLMS";
 	m_GameFlags = GAMEFLAG_SURVIVAL;
 }
 
