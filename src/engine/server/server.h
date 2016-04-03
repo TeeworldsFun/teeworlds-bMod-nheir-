@@ -126,6 +126,9 @@ public:
 		int m_MapChunk;
 		bool m_NoRconNote;
 		bool m_Quitting;
+
+		bool m_IsBot;
+
 		const IConsole::CCommandInfo *m_pRconCmdToSend;
 
 		void Reset();
@@ -201,6 +204,8 @@ public:
 	virtual int SendMsg(CMsgPacker *pMsg, int Flags, int ClientID);
 
 	void DoSnapshot();
+
+	int NewBot(int ClientID);
 
 	static int NewClientCallback(int ClientID, void *pUser);
 	static int DelClientCallback(int ClientID, const char *pReason, void *pUser);

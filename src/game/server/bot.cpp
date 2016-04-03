@@ -737,7 +737,3 @@ void CBot::Snap(int SnappingClient)
 		pObj->m_StartTick = GameServer()->Server()->Tick();
 	}
 }
-
-const char *CBot::GetName() {
-	return g_BotName[m_pPlayer->GetCID()];
-}

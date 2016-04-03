@@ -244,6 +244,8 @@ void CServerBan::ConBanExt(IConsole::IResult *pResult, void *pUser)
 		int ClientID = str_toint(pStr);
 		if(ClientID < 0 || ClientID >= MAX_CLIENTS || pThis->Server()->m_aClients[ClientID].m_State == CServer::CClient::STATE_EMPTY)
 			pThis->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "net_ban", "ban error (invalid client id)");
+		else if(ClientID >= 0 && ClientID < MAX_CLIENTS && pThis->Server()->m_aClients[ClientID].m_IsBot)
+			pThis->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "net_ban", "ban error (command denied)");
 		else
 			pThis->BanAddr(pThis->Server()->m_NetServer.ClientAddr(ClientID), Minutes*60, pReason);
 	}
@@ -333,12 +335,17 @@ void CServer::Kick(int ClientID, const char *pReason)
 	else if(m_RconClientID == ClientID)
 	{
 		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "you can't kick yourself");
- 		return;
+		return;
 	}
 	else if(m_aClients[ClientID].m_Authed > m_RconAuthLevel)
 	{
 		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "kick command denied");
- 		return;
+		return;
+	}
+	else if(m_aClients[ClientID].m_IsBot)
+	{
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "kick command denied");
+		return;
 	}
 
 	m_NetServer.Drop(ClientID, pReason);
@@ -368,6 +375,7 @@ int CServer::Init()
 		m_aClients[i].m_aClan[0] = 0;
 		m_aClients[i].m_Country = -1;
 		m_aClients[i].m_Snapshots.Init();
+		m_aClients[i].m_IsBot = false;
 	}
 
 	m_CurrentGameTick = 0;
@@ -509,13 +517,13 @@ int CServer::SendMsg(CMsgPacker *pMsg, int Flags, int ClientID)
 			// broadcast
 			int i;
 			for(i = 0; i < MAX_CLIENTS; i++)
-				if(m_aClients[i].m_State == CClient::STATE_INGAME && !m_aClients[i].m_Quitting)
+				if(m_aClients[i].m_State == CClient::STATE_INGAME && !m_aClients[i].m_Quitting && !m_aClients[i].m_IsBot)
 				{
 					Packet.m_ClientID = i;
 					m_NetServer.Send(&Packet);
 				}
 		}
-		else if(m_aClients[ClientID].m_State != CClient::STATE_EMPTY) //Test pour ne rien envoyer à un bot
+		else
 			m_NetServer.Send(&Packet);
 	}
 	return 0;
@@ -545,6 +553,10 @@ void CServer::DoSnapshot()
 	{
 		// client must be ingame to recive snapshots
 		if(m_aClients[i].m_State != CClient::STATE_INGAME)
+			continue;
+
+		// client must be human to recive snapshots
+		if(m_aClients[i].m_IsBot)
 			continue;
 
 		// this client is trying to recover, don't spam snapshots
@@ -653,6 +665,13 @@ void CServer::DoSnapshot()
 	GameServer()->OnPostSnap();
 }
 
+int CServer::NewBot(int ClientID)
+{
+	m_aClients[ClientID].m_State = CClient::STATE_INGAME;
+	m_aClients[ClientID].m_IsBot = true;
+	return 0;
+}
+
 
 int CServer::NewClientCallback(int ClientID, void *pUser)
 {
@@ -666,6 +685,7 @@ int CServer::NewClientCallback(int ClientID, void *pUser)
 	pThis->m_aClients[ClientID].m_pRconCmdToSend = 0;
 	pThis->m_aClients[ClientID].m_NoRconNote = false;
 	pThis->m_aClients[ClientID].m_Quitting = false;
+	pThis->m_aClients[ClientID].m_IsBot = false;
 	pThis->m_aClients[ClientID].Reset();
 	return 0;
 }
@@ -696,6 +716,7 @@ int CServer::DelClientCallback(int ClientID, const char *pReason, void *pUser)
 	pThis->m_aClients[ClientID].m_pRconCmdToSend = 0;
 	pThis->m_aClients[ClientID].m_NoRconNote = false;
 	pThis->m_aClients[ClientID].m_Quitting = false;
+	pThis->m_aClients[ClientID].m_IsBot = false;
 	pThis->m_aClients[ClientID].m_Snapshots.PurgeAll();
 	return 0;
 }
@@ -1109,7 +1130,7 @@ void CServer::SendServerInfo(int ClientID)
 	{
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			if(m_aClients[i].m_State != CClient::STATE_EMPTY)
+			if(m_aClients[i].m_State != CClient::STATE_EMPTY && ! m_aClients[i].m_IsBot)
 				SendMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH, i);
 		}
 	}
@@ -1143,7 +1164,7 @@ void CServer::PumpNetwork()
 
 				CPacker Packer;
 				CNetChunk Response;
-				
+
 				GenerateServerInfo(&Packer, SrvBrwsToken);
 
 				Response.m_ClientID = -1;
@@ -1400,7 +1421,7 @@ int CServer::Run()
 	// disconnect all clients on shutdown
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
-		if(m_aClients[i].m_State != CClient::STATE_EMPTY)
+		if(m_aClients[i].m_State != CClient::STATE_EMPTY && ! m_aClients[i].m_IsBot)
 			m_NetServer.Drop(i, "Server shutdown");
 
 		m_Econ.Shutdown();
@@ -1434,7 +1455,7 @@ void CServer::ConStatus(IConsole::IResult *pResult, void *pUser)
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(pThis->m_aClients[i].m_State != CClient::STATE_EMPTY)
+		if(pThis->m_aClients[i].m_State != CClient::STATE_EMPTY && ! pThis->m_aClients[i].m_IsBot)
 		{
 			net_addr_str(pThis->m_NetServer.ClientAddr(i), aAddrStr, sizeof(aAddrStr), true);
 			if(pThis->m_aClients[i].m_State == CClient::STATE_INGAME)

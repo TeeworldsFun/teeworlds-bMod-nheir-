@@ -613,7 +613,7 @@ void CGameContext::OnClientEnter(int ClientID)
 	NewClientInfoMsg.m_ClientID = ClientID;
 	NewClientInfoMsg.m_Local = 0;
 	NewClientInfoMsg.m_Team = m_apPlayers[ClientID]->GetTeam();
-	NewClientInfoMsg.m_pName = (m_apPlayers[ClientID]->IsBot()) ? g_BotName[ClientID] : Server()->ClientName(ClientID);
+	NewClientInfoMsg.m_pName = (m_apPlayers[ClientID]->IsBot()) ? g_aBotName[ClientID] : Server()->ClientName(ClientID);
 	NewClientInfoMsg.m_pClan = (m_apPlayers[ClientID]->IsBot()) ? g_BotClan : Server()->ClientClan(ClientID);
 	NewClientInfoMsg.m_Country = Server()->ClientCountry(ClientID);
 	for(int p = 0; p < 6; p++)
@@ -638,7 +638,7 @@ void CGameContext::OnClientEnter(int ClientID)
 		ClientInfoMsg.m_ClientID = i;
 		ClientInfoMsg.m_Local = 0;
 		ClientInfoMsg.m_Team = m_apPlayers[i]->GetTeam();
-		ClientInfoMsg.m_pName = (m_apPlayers[i]->IsBot()) ? g_BotName[i] : Server()->ClientName(i);
+		ClientInfoMsg.m_pName = (m_apPlayers[i]->IsBot()) ? g_aBotName[i] : Server()->ClientName(i);
 		ClientInfoMsg.m_pClan = (m_apPlayers[i]->IsBot()) ? g_BotClan : Server()->ClientClan(i);
 		ClientInfoMsg.m_Country = Server()->ClientCountry(i);
 		for(int p = 0; p < 6; p++)
@@ -1605,7 +1605,9 @@ void CGameContext::CheckBotNumber() {
 					dbg_msg("context","Add a bot at slot: %d", LastFreeSlot);
 					m_apPlayers[LastFreeSlot]->m_IsBot = true;
 					m_apPlayers[LastFreeSlot]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[LastFreeSlot]);
-					OnClientEnter(LastFreeSlot);
+					Server()->NewBot(LastFreeSlot);
+					Server()->SetClientName(LastFreeSlot, g_aBotName[LastFreeSlot]);
+					Server()->SetClientClan(LastFreeSlot, g_BotClan);
 				}
 				else {
 					delete m_apPlayers[LastFreeSlot];
