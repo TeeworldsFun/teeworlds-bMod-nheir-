@@ -1556,18 +1556,36 @@ void CGameContext::DeleteBot(int i) {
 	}
 }
 
-void CGameContext::AddBot(int i, bool UseDropPlayer) {
-	dbg_msg("context","Add a bot at slot: %d", i);
+bool CGameContext::AddBot(int i, bool UseDropPlayer) {
 	const int StartTeam = m_pController->GetStartTeam();
 	if(StartTeam == TEAM_SPECTATORS)
-		return;
+		return false;
+	if(Server()->NewBot(i) == 1)
+		return false;
+	dbg_msg("context","Add a bot at slot: %d", i);
 	if(!UseDropPlayer || !m_apPlayers[i])
 		m_apPlayers[i] = new(i) CPlayer(this, i, StartTeam);
 	m_apPlayers[i]->m_IsBot = true;
 	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
-	Server()->NewBot(i);
 	Server()->SetClientName(i, g_aBotName[i]);
 	Server()->SetClientClan(i, g_BotClan);
+	return true;
+}
+
+bool CGameContext::ReplacePlayerByBot(int ClientID) {
+	int BotNumber = 0;
+	int PlayerCount = -1;
+	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
+		if(!m_apPlayers[i])
+			continue;
+		if(m_apPlayers[i]->m_IsBot)
+			BotNumber++;
+		else
+			PlayerCount++;
+	}
+	if(!PlayerCount || BotNumber >= g_Config.m_SvBotSlots)
+		return false;
+	return AddBot(ClientID, true);
 }
 
 void CGameContext::CheckBotNumber() {

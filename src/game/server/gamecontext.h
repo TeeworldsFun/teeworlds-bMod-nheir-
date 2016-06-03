@@ -153,7 +153,8 @@ public:
 
 	// Bot slots
 	virtual void DeleteBot(int i);
-	void AddBot(int i, bool UseDropPlayer = false);
+	bool AddBot(int i, bool UseDropPlayer = false);
+	virtual bool ReplacePlayerByBot(int ClientID);
 	void CheckBotNumber();
 
 	//
