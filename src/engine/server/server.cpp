@@ -694,6 +694,10 @@ int CServer::DelBot(int ClientID)
 int CServer::NewClientCallback(int ClientID, void *pUser)
 {
 	CServer *pThis = (CServer *)pUser;
+
+	if(pThis->m_aClients[ClientID].m_IsBot)
+		pThis->GameServer()->DeleteBot(ClientID);
+
 	pThis->m_aClients[ClientID].m_State = CClient::STATE_AUTH;
 	pThis->m_aClients[ClientID].m_aName[0] = 0;
 	pThis->m_aClients[ClientID].m_aClan[0] = 0;

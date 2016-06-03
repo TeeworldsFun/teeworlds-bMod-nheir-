@@ -1547,23 +1547,27 @@ const char *CGameContext::NetVersion() const { return GAME_NETVERSION; }
 
 IGameServer *CreateGameServer() { return new CGameContext; }
 
-void CGameContext::TryMoveBot(int ClientID)
-{
-	if(!m_apPlayers[ClientID] or !m_apPlayers[ClientID]->IsBot())
-		return;
-	int i;
-	for(i=0 ; i<MAX_CLIENTS ; i++)
-		if(!m_apPlayers[i])
-			break;
-	if(i < MAX_CLIENTS)
-	{
-		dbg_msg("context","Move bot from slot %d to slot %d", ClientID, i);
-		m_apPlayers[i] = new(i) CPlayer(this, i, m_apPlayers[ClientID]->GetTeam());
-		*m_apPlayers[i] = *m_apPlayers[ClientID];
-		m_apPlayers[i]->SetCID(i);
+void CGameContext::DeleteBot(int i) {
+	Server()->DelBot(i);
+	if(m_apPlayers[i] && m_apPlayers[i]->m_IsBot) {
+		dbg_msg("context","Delete bot at slot: %d", i);
+		delete m_apPlayers[i];
+		m_apPlayers[i] = 0;
 	}
-	delete m_apPlayers[ClientID];
-	m_apPlayers[ClientID] = 0;
+}
+
+void CGameContext::AddBot(int i, bool UseDropPlayer) {
+	dbg_msg("context","Add a bot at slot: %d", i);
+	const int StartTeam = m_pController->GetStartTeam();
+	if(StartTeam == TEAM_SPECTATORS)
+		return;
+	if(!UseDropPlayer || !m_apPlayers[i])
+		m_apPlayers[i] = new(i) CPlayer(this, i, StartTeam);
+	m_apPlayers[i]->m_IsBot = true;
+	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
+	Server()->NewBot(i);
+	Server()->SetClientName(i, g_aBotName[i]);
+	Server()->SetClientClan(i, g_BotClan);
 }
 
 void CGameContext::CheckBotNumber() {
@@ -1586,10 +1590,8 @@ void CGameContext::CheckBotNumber() {
 			for(; FirstBot < MAX_CLIENTS ; FirstBot++)
 				if(m_apPlayers[FirstBot] && m_apPlayers[FirstBot]->IsBot())
 					break;
-			if(FirstBot < MAX_CLIENTS) {
-				dbg_msg("context","Remove bot at slot: %d", FirstBot);
-				OnClientDrop(FirstBot, "Everything is awesome");
-			}
+			if(FirstBot < MAX_CLIENTS)
+				DeleteBot(FirstBot);
 		}
 	}
 	// Add missing bot if possible
@@ -1599,22 +1601,8 @@ void CGameContext::CheckBotNumber() {
 			for(; LastFreeSlot >= 0 ; LastFreeSlot--)
 				if(!m_apPlayers[LastFreeSlot])
 					break;
-			if( LastFreeSlot >= 0) {
-				m_apPlayers[LastFreeSlot] = new(LastFreeSlot) CPlayer(this, LastFreeSlot, false);
-				if(m_apPlayers[LastFreeSlot]->GetTeam() != TEAM_SPECTATORS)	{
-					dbg_msg("context","Add a bot at slot: %d", LastFreeSlot);
-					m_apPlayers[LastFreeSlot]->m_IsBot = true;
-					m_apPlayers[LastFreeSlot]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[LastFreeSlot]);
-					Server()->NewBot(LastFreeSlot);
-					Server()->SetClientName(LastFreeSlot, g_aBotName[LastFreeSlot]);
-					Server()->SetClientClan(LastFreeSlot, g_BotClan);
-				}
-				else {
-					delete m_apPlayers[LastFreeSlot];
-					m_apPlayers[LastFreeSlot] = 0;
-					break;
-				}
-			}
+			if( LastFreeSlot >= 0)
+				AddBot(LastFreeSlot);
 		}
 	}
 }

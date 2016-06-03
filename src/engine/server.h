@@ -100,6 +100,8 @@ public:
 	virtual const char *GameType() const = 0;
 	virtual const char *Version() const = 0;
 	virtual const char *NetVersion() const = 0;
+
+	virtual void DeleteBot(int i) = 0;
 };
 
 extern IGameServer *CreateGameServer();

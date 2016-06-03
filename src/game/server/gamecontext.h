@@ -152,7 +152,8 @@ public:
 	void SendTuningParams(int ClientID);
 
 	// Bot slots
-	void TryMoveBot(int ClientID);
+	virtual void DeleteBot(int i);
+	void AddBot(int i, bool UseDropPlayer = false);
 	void CheckBotNumber();
 
 	//
