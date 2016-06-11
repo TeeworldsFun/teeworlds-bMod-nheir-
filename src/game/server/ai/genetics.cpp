@@ -27,7 +27,7 @@ void CGenetics::Evolve()
 	for(int i = 0 ; i < m_NumGenomes ; i++)
 	{
 		CGenome Genome = m_pGenomes[i];
-		dbg_msg("Cgentics", "fitness=%d (%d %d %d %d %d %d %d %d)", Genome.m_Fitness, Genome.m_pGenome[0], Genome.m_pGenome[1], Genome.m_pGenome[2], Genome.m_pGenome[3], Genome.m_pGenome[4], Genome.m_pGenome[5], Genome.m_pGenome[6], Genome.m_pGenome[7]);
+		dbg_msg("Cgenetics", "fitness=%d (%d %d %d %d %d %d %d %d)", Genome.m_Fitness, Genome.m_pGenome[0], Genome.m_pGenome[1], Genome.m_pGenome[2], Genome.m_pGenome[3], Genome.m_pGenome[4], Genome.m_pGenome[5], Genome.m_pGenome[6], Genome.m_pGenome[7]);
 	}
 	// Merge
 	for(int i = 0 ; i < (m_NumGenomes >> 1) ; i++)
