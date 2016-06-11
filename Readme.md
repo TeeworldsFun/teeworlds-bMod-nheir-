@@ -1,6 +1,15 @@
 # Bot Mod for Teeworlds
 This is a server mod of Teeworlds that bring bots in Vanilla gameplay.
 
+## Branch simu
+This branch is not playable.
+I removed network server from the main loop so it's not possible to connect as usual.
+Note that the econ server is still in place but is not tested yet.
+
+It allows to run simulation 80x time faster than real time while recording demos playable in the teeworlds client.
+
+I made this to eventually run some kind of genetics or unsupervised learning on some aspects of the AI.
+
 ## Settings
 
 |Command |  Description | Default|
