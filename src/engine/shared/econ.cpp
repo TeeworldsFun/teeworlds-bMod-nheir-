@@ -60,7 +60,7 @@ void CEcon::ConLogout(IConsole::IResult *pResult, void *pUserData)
 		pThis->m_NetConsole.Drop(pThis->m_UserClientID, "Logout");
 }
 
-void CEcon::Init(IConsole *pConsole, CNetBan *pNetBan)
+void CEcon::Init(IConsole *pConsole)
 {
 	m_pConsole = pConsole;
 
@@ -87,7 +87,7 @@ void CEcon::Init(IConsole *pConsole, CNetBan *pNetBan)
 		BindAddr.port = g_Config.m_EcPort;
 	}
 
-	if(m_NetConsole.Open(BindAddr, pNetBan, 0))
+	if(m_NetConsole.Open(BindAddr, 0))
 	{
 		m_NetConsole.SetCallbacks(NewClientCallback, DelClientCallback, this);
 		m_Ready = true;
@@ -133,12 +133,6 @@ void CEcon::Update()
 				char aMsg[128];
 				str_format(aMsg, sizeof(aMsg), "Wrong password %d/%d.", m_aClients[ClientID].m_AuthTries, MAX_AUTH_TRIES);
 				m_NetConsole.Send(ClientID, aMsg);
-				if(m_aClients[ClientID].m_AuthTries >= MAX_AUTH_TRIES)
-				{
-					if(g_Config.m_EcBantime)
-						m_NetConsole.NetBan()->BanAddr(m_NetConsole.ClientAddr(ClientID), g_Config.m_EcBantime*60, "Too many authentication tries");
-					m_NetConsole.Drop(ClientID, "Too many authentication tries");
-				}
 			}
 		}
 		else if(m_aClients[ClientID].m_State == CClient::STATE_AUTHED)

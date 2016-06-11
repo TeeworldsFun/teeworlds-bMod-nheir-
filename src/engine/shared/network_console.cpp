@@ -8,14 +8,13 @@
 #include "network.h"
 
 
-bool CNetConsole::Open(NETADDR BindAddr, CNetBan *pNetBan, int Flags)
+bool CNetConsole::Open(NETADDR BindAddr,int Flags)
 {
 	// zero out the whole structure
 	mem_zero(this, sizeof(*this));
 	m_Socket.type = NETTYPE_INVALID;
 	m_Socket.ipv4sock = -1;
 	m_Socket.ipv6sock = -1;
-	m_pNetBan = pNetBan;
 
 	// open socket
 	m_Socket = net_tcp_create(BindAddr);
@@ -104,16 +103,7 @@ int CNetConsole::Update()
 
 	if(net_tcp_accept(m_Socket, &Socket, &Addr) > 0)
 	{
-		// check if we just should drop the packet
-		char aBuf[128];
-		if(NetBan() && NetBan()->IsBanned(&Addr, aBuf, sizeof(aBuf)))
-		{
-			// banned, reply with a message and drop
-			net_tcp_send(Socket, aBuf, str_length(aBuf));
-			net_tcp_close(Socket);
-		}
-		else
-			AcceptClient(Socket, &Addr);
+		AcceptClient(Socket, &Addr);
 	}
 
 	for(int i = 0; i < NET_MAX_CONSOLE_CLIENTS; i++)

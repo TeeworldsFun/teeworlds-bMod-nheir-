@@ -299,7 +299,6 @@ class CNetConsole
 	};
 
 	NETSOCKET m_Socket;
-	class CNetBan *m_pNetBan;
 	CSlot m_aSlots[NET_MAX_CONSOLE_CLIENTS];
 
 	NETFUNC_NEWCLIENT m_pfnNewClient;
@@ -312,7 +311,7 @@ public:
 	void SetCallbacks(NETFUNC_NEWCLIENT pfnNewClient, NETFUNC_DELCLIENT pfnDelClient, void *pUser);
 
 	//
-	bool Open(NETADDR BindAddr, class CNetBan *pNetBan, int Flags);
+	bool Open(NETADDR BindAddr, int Flags);
 	int Close();
 
 	//
@@ -326,7 +325,6 @@ public:
 
 	// status requests
 	const NETADDR *ClientAddr(int ClientID) const { return m_aSlots[ClientID].m_Connection.PeerAddress(); }
-	class CNetBan *NetBan() const { return m_pNetBan; }
 };
 
 
