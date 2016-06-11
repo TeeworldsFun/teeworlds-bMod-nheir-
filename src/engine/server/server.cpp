@@ -667,7 +667,7 @@ void CServer::DoSnapshot()
 
 int CServer::NewBot(int ClientID)
 {
-	if(m_aClients[ClientID].m_State > CClient::STATE_EMPTY )
+	if(m_aClients[ClientID].m_State > CClient::STATE_EMPTY && !m_aClients[ClientID].m_IsBot)
 		return 1;
 	m_aClients[ClientID].m_State = CClient::STATE_INGAME;
 	m_aClients[ClientID].m_IsBot = true;
