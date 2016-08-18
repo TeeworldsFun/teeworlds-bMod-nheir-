@@ -484,6 +484,8 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 		vec2 aProjectilePos[BOT_HOOK_DIRS];
 
+		const int NbLoops = 10;
+
 		vec2 aTargetPos[MAX_CLIENTS];
 		vec2 aTargetVel[MAX_CLIENTS];
 
@@ -514,7 +516,6 @@ void CBot::HandleWeapon(bool SeeTarget)
 					Time = GameServer()->Tuning()->m_GunLifetime;
 					break;
 			}
-			const int NbLoops = 10;
 			//DTime /= NbLoops;
 			int DTick = (int) (Time * GameServer()->Server()->TickSpeed() / NbLoops);
 			// DTime *= Speed;
@@ -553,8 +554,8 @@ void CBot::HandleWeapon(bool SeeTarget)
 				}
 				for(int c = 0; c < Count; c++)
 				{
-					Collision()->MoveBox(&aTargetPos[c], &aTargetVel[c], vec2(28.f,28.f), 0);
-					//Collision()->FastIntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
+					//Collision()->MoveBox(&aTargetPos[c], &aTargetVel[c], vec2(28.f,28.f), 0);
+					Collision()->FastIntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
 					aTargetVel[c].y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
 				}
 			}
