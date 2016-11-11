@@ -42,16 +42,17 @@ void CBot::OnReset()
 	m_Flags = 0;
 	m_pPath->m_Size = 0;
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
-	m_Genetics.SetFitness(m_GenomeTick);
-	m_Genetics.NextGenome();
-	m_GenomeTick = 0;
-	UpdateTargetOrder();
-	dbg_msg("bot", "new target order %d %d %d %d %d %d %d %d", m_aTargetOrder[0], m_aTargetOrder[1], m_aTargetOrder[2], m_aTargetOrder[3], m_aTargetOrder[4], m_aTargetOrder[5], m_aTargetOrder[6], m_aTargetOrder[7]);
+	//m_Genetics.SetFitness(m_GenomeTick);
+	//m_Genetics.NextGenome();
+	//m_GenomeTick = 0;
+	//UpdateTargetOrder();
+	//dbg_msg("bot", "new target order %d %d %d %d %d %d %d %d", m_aTargetOrder[0], m_aTargetOrder[1], m_aTargetOrder[2], m_aTargetOrder[3], m_aTargetOrder[4], m_aTargetOrder[5], m_aTargetOrder[6], m_aTargetOrder[7]);
 }
 
 void CBot::UpdateTargetOrder()
 {
-	int *pGenome = m_Genetics.GetGenome();
+	//int *pGenome = m_Genetics.GetGenome();
+	const int *pGenome = &g_aBotPriority[m_pPlayer->GetCID()][0];
 	for(int i = 0 ; i < CTarget::NUM_TARGETS ; i++)
 	{
 		int j = i;
@@ -79,7 +80,7 @@ vec2 CBot::ClosestCharacter()
 
 void CBot::UpdateTarget()
 {
-	m_GenomeTick++;
+	//m_GenomeTick++;
 	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;// || !m_pPath->m_Size;
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID] && GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
@@ -111,23 +112,6 @@ void CBot::UpdateTarget()
 					int Team = m_pPlayer->GetTeam();
 					CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
 					CFlag **apFlags = pController->m_apFlags;
-					if(apFlags[Team^1])
-					{
-						// Go to enemy flagstand
-						if(apFlags[Team^1]->IsAtStand())
-						{
-							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
-							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
-							return;
-						}
-						// Go to base carrying flag
-						if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter() && (!apFlags[Team] || apFlags[Team]->IsAtStand()))
-						{
-							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team);
-							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
-							return;
-						}
-					}
 					if(apFlags[Team])
 					{
 						// Retrieve missing flag
@@ -143,6 +127,23 @@ void CBot::UpdateTarget()
 							m_ComputeTarget.m_Pos = apFlags[Team]->GetPos();
 							m_ComputeTarget.m_Type = CTarget::TARGET_PLAYER;
 							m_ComputeTarget.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
+							return;
+						}
+					}
+					if(apFlags[Team^1])
+					{
+						// Go to enemy flagstand
+						if(apFlags[Team^1]->IsAtStand())
+						{
+							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
+							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
+							return;
+						}
+						// Go to base carrying flag
+						if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter() && (!apFlags[Team] || apFlags[Team]->IsAtStand()))
+						{
+							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team);
+							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
 							return;
 						}
 					}
