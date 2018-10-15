@@ -613,8 +613,8 @@ void CGameContext::OnClientEnter(int ClientID)
 	NewClientInfoMsg.m_ClientID = ClientID;
 	NewClientInfoMsg.m_Local = 0;
 	NewClientInfoMsg.m_Team = m_apPlayers[ClientID]->GetTeam();
-	NewClientInfoMsg.m_pName = (m_apPlayers[ClientID]->IsBot()) ? g_aBotName[ClientID] : Server()->ClientName(ClientID);
-	NewClientInfoMsg.m_pClan = (m_apPlayers[ClientID]->IsBot()) ? g_BotClan : Server()->ClientClan(ClientID);
+	NewClientInfoMsg.m_pName = Server()->ClientName(ClientID);
+	NewClientInfoMsg.m_pClan = Server()->ClientClan(ClientID);
 	NewClientInfoMsg.m_Country = Server()->ClientCountry(ClientID);
 	for(int p = 0; p < 6; p++)
 	{
@@ -638,8 +638,8 @@ void CGameContext::OnClientEnter(int ClientID)
 		ClientInfoMsg.m_ClientID = i;
 		ClientInfoMsg.m_Local = 0;
 		ClientInfoMsg.m_Team = m_apPlayers[i]->GetTeam();
-		ClientInfoMsg.m_pName = (m_apPlayers[i]->IsBot()) ? g_aBotName[i] : Server()->ClientName(i);
-		ClientInfoMsg.m_pClan = (m_apPlayers[i]->IsBot()) ? g_BotClan : Server()->ClientClan(i);
+		ClientInfoMsg.m_pName = Server()->ClientName(i);
+		ClientInfoMsg.m_pClan = Server()->ClientClan(i);
 		ClientInfoMsg.m_Country = Server()->ClientCountry(i);
 		for(int p = 0; p < 6; p++)
 		{
@@ -1548,35 +1548,39 @@ const char *CGameContext::NetVersion() const { return GAME_NETVERSION; }
 IGameServer *CreateGameServer() { return new CGameContext; }
 
 void CGameContext::DeleteBot(int i) {
-	Server()->DelBot(i);
 	if(m_apPlayers[i] && m_apPlayers[i]->m_IsBot) {
 		dbg_msg("context","Delete bot at slot: %d", i);
+		m_pController->OnPlayerDisconnect(m_apPlayers[i]);
 		delete m_apPlayers[i];
 		m_apPlayers[i] = 0;
 	}
+	Server()->DelBot(i);
 }
 
-bool CGameContext::AddBot(int i, bool UseDropPlayer) {
-	const int StartTeam = m_pController->GetStartTeam();
-	if(StartTeam == TEAM_SPECTATORS)
+bool CGameContext::AddBot(int i) {
+	if(m_apPlayers[i])
 		return false;
 	if(Server()->NewBot(i) == 1)
 		return false;
 	dbg_msg("context","Add a bot at slot: %d", i);
-	if(!UseDropPlayer || !m_apPlayers[i])
-		m_apPlayers[i] = new(i) CPlayer(this, i, StartTeam);
+	m_apPlayers[i] = new(i) CPlayer(this, i, false);
 	m_apPlayers[i]->m_IsBot = true;
 	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
 	Server()->SetClientName(i, g_aBotName[i]);
 	Server()->SetClientClan(i, g_BotClan);
+	m_pController->OnPlayerConnect(m_apPlayers[i]);
 	return true;
 }
 
 bool CGameContext::ReplacePlayerByBot(int ClientID) {
+	if(!m_apPlayers[ClientID])
+		return false;
 	int BotNumber = 0;
 	int PlayerCount = -1;
 	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
 		if(!m_apPlayers[i])
+			continue;
+		if(i == ClientID)
 			continue;
 		if(m_apPlayers[i]->m_IsBot)
 			BotNumber++;
@@ -1585,7 +1589,12 @@ bool CGameContext::ReplacePlayerByBot(int ClientID) {
 	}
 	if(!PlayerCount || BotNumber >= g_Config.m_SvBotSlots)
 		return false;
-	return AddBot(ClientID, true);
+	m_apPlayers[ClientID]->m_IsBot = true;
+	m_apPlayers[ClientID]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[ClientID]);
+	Server()->SetClientName(ClientID, g_aBotName[ClientID]);
+	Server()->SetClientClan(ClientID, g_BotClan);
+	dbg_msg("context","Replace player by bot at slot: %d", ClientID);
+	return true;
 }
 
 void CGameContext::CheckBotNumber() {
