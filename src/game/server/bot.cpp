@@ -270,7 +270,7 @@ void CBot::Tick()
 	if(!m_pPlayer->GetCharacter())
 		return;
 	const CCharacterCore *pMe = m_pPlayer->GetCharacter()->GetCore();
-	int Team = m_pPlayer->GetTeam();
+	// int Team = m_pPlayer->GetTeam();
 
 	UpdateTarget();
 
@@ -443,7 +443,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 	int Team = m_pPlayer->GetTeam();
 	vec2 Pos = pMe->GetCore()->m_Pos;
-	vec2 Vel = pMe->GetCore()->m_Vel;
+	// vec2 Vel = pMe->GetCore()->m_Vel;
 
 	CCharacterCore* apTarget[MAX_CLIENTS];
 	int Count = 0;
@@ -507,6 +507,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 					break;
 
 				case WEAPON_GUN:
+				default:
 					Curvature = GameServer()->Tuning()->m_GunCurvature;
 					Speed = GameServer()->Tuning()->m_GunSpeed;
 					DTime = GameServer()->Tuning()->m_GunLifetime / 10.;

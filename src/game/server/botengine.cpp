@@ -195,7 +195,7 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 
 		int j = m_Height-1;
 		int Margin = 6;
-		int MarginH = 3;
+		// int MarginH = 3;
 		for(int i = 0; i < m_Width; i++)
 		{
 			int Index = m_pTiles[i+j*m_Width].m_Reserved;
@@ -677,9 +677,9 @@ void CBotEngine::GenerateTriangles()
 				if (found)
 					continue;
 
-				vec2 a = triangle.CenterA();
-				vec2 b = triangle.CenterB();
-				vec2 c = triangle.CenterC();
+				// vec2 a = triangle.CenterA();
+				// vec2 b = triangle.CenterB();
+				// vec2 c = triangle.CenterC();
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_Triangle = triangle;
 
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[0] = GameServer()->Server()->SnapNewID();
@@ -727,9 +727,9 @@ void CBotEngine::GenerateTriangles()
 				if (found)
 					continue;
 
-				vec2 a = triangle.CenterA();
-				vec2 b = triangle.CenterB();
-				vec2 c = triangle.CenterC();
+				// vec2 a = triangle.CenterA();
+				// vec2 b = triangle.CenterB();
+				// vec2 c = triangle.CenterC();
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_Triangle = triangle;
 
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[0] = GameServer()->Server()->SnapNewID();
@@ -919,7 +919,7 @@ int CBotEngine::DistanceToEdge(CEdge Edge, vec2 Pos)
 	if(!Edge.m_Size)
 		return -1;
 
-	int ClosestRange = -1;
+	// int ClosestRange = -1;
 
 	vec2 InterPos = closest_point_on_line(Edge.m_Start,Edge.m_End, Pos);
 	return distance(InterPos,Pos);
@@ -951,8 +951,8 @@ int CBotEngine::GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge)
 {
 	CEdge* ClosestEdge = 0;
 
-	int x = round_to_int(Pos.x/32);
-	int y = round_to_int(Pos.y/32);
+	// int x = round_to_int(Pos.x/32);
+	// int y = round_to_int(Pos.y/32);
 
 	for(int k = 0; k < m_Graph.m_NumEdges; k++)
 	{
