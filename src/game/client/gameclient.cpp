@@ -87,6 +87,7 @@ void CGameClient::CStack::Add(class CComponent *pComponent) { m_paComponents[m_N
 
 const char *CGameClient::Version() const { return GAME_VERSION; }
 const char *CGameClient::NetVersion() const { return GAME_NETVERSION; }
+int CGameClient::ClientVersion() const { return CLIENT_VERSION; }
 const char *CGameClient::GetItemName(int Type) const { return m_NetObjHandler.GetObjName(Type); }
 
 const char *CGameClient::GetTeamName(int Team, bool Teamplay) const
@@ -259,7 +260,6 @@ void CGameClient::OnInit()
 		Client()->SnapSetStaticsize(i, m_NetObjHandler.GetObjSize(i));
 
 	// load default font
-	static CFont *pDefaultFont = 0;
 	char aFontName[256];
 	str_format(aFontName, sizeof(aFontName), "fonts/%s", g_Config.m_ClFontfile);
 	char aFilename[512];
@@ -267,14 +267,12 @@ void CGameClient::OnInit()
 	if(File)
 	{
 		io_close(File);
-		pDefaultFont = TextRender()->LoadFont(aFilename);
-		TextRender()->SetDefaultFont(pDefaultFont);
-	}
-	if(!pDefaultFont)
-	{
-		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "failed to load font. filename='%s'", aFontName);
-		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gameclient", aBuf);
+		if(TextRender()->LoadFont(aFilename))
+		{
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "failed to load font. filename='%s'", aFontName);
+			Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gameclient", aBuf);
+		}
 	}
 
 	// init all components
@@ -367,7 +365,8 @@ void CGameClient::OnReset()
 	m_LocalClientID = -1;
 	m_TeamCooldownTick = 0;
 	mem_zero(&m_GameInfo, sizeof(m_GameInfo));
-	m_DemoSpecID = SPEC_FREEVIEW;
+	m_DemoSpecMode = SPEC_FREEVIEW;
+	m_DemoSpecID = -1;
 	m_Tuning = CTuningParams();
 }
 
@@ -396,7 +395,7 @@ void CGameClient::UpdatePositions()
 	if(m_Snap.m_SpecInfo.m_Active)
 	{
 		if(Client()->State() == IClient::STATE_DEMOPLAYBACK && DemoPlayer()->GetDemoType() == IDemoPlayer::DEMOTYPE_SERVER &&
-			m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
+			m_Snap.m_SpecInfo.m_SpectatorID != -1)
 		{
 			m_Snap.m_SpecInfo.m_Position = mix(
 				vec2(m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_X, m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_Y),
@@ -404,7 +403,7 @@ void CGameClient::UpdatePositions()
 				Client()->IntraGameTick());
 			m_Snap.m_SpecInfo.m_UsePosition = true;
 		}
-		else if(m_Snap.m_pSpectatorInfo && (Client()->State() == IClient::STATE_DEMOPLAYBACK || m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW))
+		else if(m_Snap.m_pSpectatorInfo && (Client()->State() == IClient::STATE_DEMOPLAYBACK || m_Snap.m_SpecInfo.m_SpecMode != SPEC_FREEVIEW))
 		{
 			if(m_Snap.m_pPrevSpectatorInfo)
 				m_Snap.m_SpecInfo.m_Position = mix(vec2(m_Snap.m_pPrevSpectatorInfo->m_X, m_Snap.m_pPrevSpectatorInfo->m_Y),
@@ -538,8 +537,10 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 			case GAMEMSG_CTF_GRAB:
 				if(m_SuppressEvents)
 					return;
-				if(m_LocalClientID != -1 && (m_aClients[m_LocalClientID].m_Team != aParaI[0] ||
-					(m_Snap.m_SpecInfo.m_Active && m_Snap.m_SpecInfo.m_SpectatorID != -1 && m_aClients[m_Snap.m_SpecInfo.m_SpectatorID].m_Team != aParaI[0])))
+				if(m_LocalClientID != -1 && (m_aClients[m_LocalClientID].m_Team != aParaI[0] || (m_Snap.m_SpecInfo.m_Active &&
+								((m_Snap.m_SpecInfo.m_SpectatorID != -1 && m_aClients[m_Snap.m_SpecInfo.m_SpectatorID].m_Team != aParaI[0]) ||
+								(m_Snap.m_SpecInfo.m_SpecMode == SPEC_FLAGRED && aParaI[0] != TEAM_RED) ||
+								(m_Snap.m_SpecInfo.m_SpecMode == SPEC_FLAGBLUE && aParaI[0] != TEAM_BLUE)))))
 					m_pSounds->Enqueue(CSounds::CHN_GLOBAL, SOUND_CTF_GRAB_PL);
 				else
 					m_pSounds->Enqueue(CSounds::CHN_GLOBAL, SOUND_CTF_GRAB_EN);
@@ -548,9 +549,11 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 				m_pSounds->Enqueue(CSounds::CHN_GLOBAL, SOUND_CTF_CAPTURE);
 				int ClientID = clamp(aParaI[1], 0, MAX_CLIENTS - 1);
 				if(aParaI[2] <= 60*Client()->GameTickSpeed())
-					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s' (%.2f seconds)"), aParaI[0] ? Localize("blue") : Localize("red"), ClientID, m_aClients[ClientID].m_aName, aParaI[2]/(float)Client()->GameTickSpeed());
+					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s' (%.2f seconds)"), aParaI[0] ? Localize("blue") : Localize("red"),
+						ClientID, g_Config.m_ClShowsocial ? m_aClients[ClientID].m_aName : "", aParaI[2]/(float)Client()->GameTickSpeed());
 				else
-					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s'"), aParaI[0] ? Localize("blue") : Localize("red"), ClientID, m_aClients[ClientID].m_aName);
+					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s'"), aParaI[0] ? Localize("blue") : Localize("red"),
+						ClientID, g_Config.m_ClShowsocial ? m_aClients[ClientID].m_aName : "");
 				m_pChat->AddLine(-1, 0, aBuf);
 			}
 			return;
@@ -893,7 +896,8 @@ void CGameClient::OnNewSnapshot()
 			aMessage[MsgLen] = 0;
 
 			CNetMsg_Cl_Say Msg;
-			Msg.m_Team = random_int()&1;
+			Msg.m_Mode = random_int()&1;
+			Msg.m_Target = -1;
 			Msg.m_pMessage = aMessage;
 			Client()->SendPackMsg(&Msg, MSGFLAG_VITAL);
 		}
@@ -980,7 +984,8 @@ void CGameClient::OnNewSnapshot()
 						if(m_aClients[ClientID].m_Team == TEAM_SPECTATORS)
 						{
 							m_Snap.m_SpecInfo.m_Active = true;
-							m_Snap.m_SpecInfo.m_SpectatorID = SPEC_FREEVIEW;
+							m_Snap.m_SpecInfo.m_SpecMode = SPEC_FREEVIEW;
+							m_Snap.m_SpecInfo.m_SpectatorID = -1;
 						}
 					}
 				}
@@ -1013,6 +1018,7 @@ void CGameClient::OnNewSnapshot()
 				m_Snap.m_pSpectatorInfo = (const CNetObj_SpectatorInfo *)pData;
 				m_Snap.m_pPrevSpectatorInfo = (const CNetObj_SpectatorInfo *)Client()->SnapFindItem(IClient::SNAP_PREV, NETOBJTYPE_SPECTATORINFO, Item.m_ID);
 				m_Snap.m_SpecInfo.m_Active = true;
+				m_Snap.m_SpecInfo.m_SpecMode = m_Snap.m_pSpectatorInfo->m_SpecMode;
 				m_Snap.m_SpecInfo.m_SpectatorID = m_Snap.m_pSpectatorInfo->m_SpectatorID;
 			}
 			else if(Item.m_Type == NETOBJTYPE_GAMEDATA)
@@ -1060,10 +1066,24 @@ void CGameClient::OnNewSnapshot()
 	{
 		m_Snap.m_SpecInfo.m_Active = true;
 		if(Client()->State() == IClient::STATE_DEMOPLAYBACK && DemoPlayer()->GetDemoType() == IDemoPlayer::DEMOTYPE_SERVER &&
-			m_DemoSpecID != SPEC_FREEVIEW && m_Snap.m_aCharacters[m_DemoSpecID].m_Active)
+			m_DemoSpecID != -1 && m_Snap.m_aCharacters[m_DemoSpecID].m_Active)
+		{
+			m_Snap.m_SpecInfo.m_SpecMode = SPEC_PLAYER;
 			m_Snap.m_SpecInfo.m_SpectatorID = m_DemoSpecID;
+		}
 		else
-			m_Snap.m_SpecInfo.m_SpectatorID = SPEC_FREEVIEW;
+		{
+			if (m_DemoSpecMode == SPEC_PLAYER)
+			{
+				m_Snap.m_SpecInfo.m_SpecMode = SPEC_FREEVIEW;
+				m_Snap.m_SpecInfo.m_SpectatorID = -1;
+			}
+			else
+			{
+				m_Snap.m_SpecInfo.m_SpecMode = m_DemoSpecMode;
+				m_Snap.m_SpecInfo.m_SpectatorID = m_DemoSpecID;
+			}
+		}
 	}
 
 	// sort player infos by score
@@ -1357,7 +1377,7 @@ void CGameClient::CClientData::Reset(CGameClient *pGameClient)
 void CGameClient::DoEnterMessage(const char *pName, int ClientID, int Team)
 {
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' entered and joined the %s"), ClientID, pName, GetTeamName(Team, m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS));
+	str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' entered and joined the %s"), ClientID, g_Config.m_ClShowsocial ? pName : "", GetTeamName(Team, m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS));
 	m_pChat->AddLine(-1, 0, aBuf);
 }
 
@@ -1365,16 +1385,16 @@ void CGameClient::DoLeaveMessage(const char *pName, int ClientID, const char *pR
 {
 	char aBuf[128];
 	if(pReason[0])
-		str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' has left the game (%s)"), ClientID, pName, pReason);
+		str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' has left the game (%s)"), ClientID, g_Config.m_ClShowsocial ? pName : "", pReason);
 	else
-		str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' has left the game"), ClientID, pName);
+		str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' has left the game"), ClientID, g_Config.m_ClShowsocial ? pName : "");
 	m_pChat->AddLine(-1, 0, aBuf);
 }
 
 void CGameClient::DoTeamChangeMessage(const char *pName, int ClientID, int Team)
 {
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' joined the %s"), ClientID, pName, GetTeamName(Team, m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS));
+	str_format(aBuf, sizeof(aBuf), Localize("'%2d: %s' joined the %s"), ClientID, g_Config.m_ClShowsocial ? pName : "", GetTeamName(Team, m_GameInfo.m_GameFlags&GAMEFLAG_TEAMS));
 	m_pChat->AddLine(-1, 0, aBuf);
 }
 

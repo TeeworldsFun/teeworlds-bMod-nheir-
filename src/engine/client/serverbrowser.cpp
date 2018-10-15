@@ -234,7 +234,7 @@ void CServerBrowser::Update(bool ForceResort)
 // interface functions
 void CServerBrowser::SetType(int Type)
 {
-	if(Type < 0 || Type >= NUM_TYPES && Type != m_ActServerlistType)
+	if(Type < 0 || Type >= NUM_TYPES || Type == m_ActServerlistType)
 		return;
 
 	m_ActServerlistType = Type;
@@ -265,7 +265,7 @@ void CServerBrowser::Refresh(int RefreshFlags)
 		mem_zero(&Packet, sizeof(Packet));
 		Packet.m_Address.type = m_pNetClient->NetType()|NETTYPE_LINK_BROADCAST;
 		Packet.m_ClientID = -1;
-		Packet.m_Flags = NETSENDFLAG_CONNLESS|NETSENDFLAG_STATELESS;
+		Packet.m_Flags = NETSENDFLAG_CONNLESS;
 		Packet.m_DataSize = Packer.Size();
 		Packet.m_pData = Packer.Data();
 		m_BroadcastTime = time_get();
@@ -464,7 +464,7 @@ void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) cons
 	CNetChunk Packet;
 	Packet.m_ClientID = -1;
 	Packet.m_Address = Addr;
-	Packet.m_Flags = NETSENDFLAG_CONNLESS|NETSENDFLAG_STATELESS;
+	Packet.m_Flags = NETSENDFLAG_CONNLESS;
 	Packet.m_DataSize = Packer.Size();
 	Packet.m_pData = Packer.Data();
 
@@ -485,11 +485,13 @@ void CServerBrowser::SetInfo(int ServerlistType, CServerEntry *pEntry, const CSe
 	if(str_comp(pEntry->m_Info.m_aGameType, "DM") == 0 || str_comp(pEntry->m_Info.m_aGameType, "TDM") == 0 || str_comp(pEntry->m_Info.m_aGameType, "CTF") == 0 ||
 		str_comp(pEntry->m_Info.m_aGameType, "SUR") == 0 ||	str_comp(pEntry->m_Info.m_aGameType, "LMS") == 0)
 		pEntry->m_Info.m_Flags |= FLAG_PURE;
-	if(str_comp(pEntry->m_Info.m_aMap, "dm1") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm2") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm6") == 0 ||
-		str_comp(pEntry->m_Info.m_aMap, "dm7") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm8") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm9") == 0 ||
+	if(str_comp(pEntry->m_Info.m_aMap, "dm1") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm2") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm3") == 0 ||
+		str_comp(pEntry->m_Info.m_aMap, "dm6") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm7") == 0 || str_comp(pEntry->m_Info.m_aMap, "dm8") == 0 ||
+		str_comp(pEntry->m_Info.m_aMap, "dm9") == 0 ||
 		str_comp(pEntry->m_Info.m_aMap, "ctf1") == 0 || str_comp(pEntry->m_Info.m_aMap, "ctf2") == 0 || str_comp(pEntry->m_Info.m_aMap, "ctf3") == 0 ||
 		str_comp(pEntry->m_Info.m_aMap, "ctf4") == 0 || str_comp(pEntry->m_Info.m_aMap, "ctf5") == 0 || str_comp(pEntry->m_Info.m_aMap, "ctf6") == 0 ||
-		str_comp(pEntry->m_Info.m_aMap, "ctf7") == 0)
+		str_comp(pEntry->m_Info.m_aMap, "ctf7") == 0 || str_comp(pEntry->m_Info.m_aMap, "ctf8") == 0 ||
+		str_comp(pEntry->m_Info.m_aMap, "sur1") == 0)
 		pEntry->m_Info.m_Flags |= FLAG_PUREMAP;
 	pEntry->m_Info.m_Favorite = Fav;
 	pEntry->m_Info.m_NetAddr = pEntry->m_Addr;

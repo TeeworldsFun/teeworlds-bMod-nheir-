@@ -239,8 +239,7 @@ void CSmoothTime::Update(CGraph *pGraph, int64 Target, int TimeLeft, int AdjustD
 		UpdateInt(Target);
 }
 
-
-CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotDelta)
+CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotDelta), m_pConLinkIdentifier("teeworlds:")
 {
 	m_pEditor = 0;
 	m_pInput = 0;
@@ -336,6 +335,7 @@ void CClient::SendInfo()
 	CMsgPacker Msg(NETMSG_INFO, true);
 	Msg.AddString(GameClient()->NetVersion(), 128);
 	Msg.AddString(g_Config.m_Password, 128);
+	Msg.AddInt(GameClient()->ClientVersion());
 	SendMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH);
 }
 
@@ -1234,7 +1234,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 
 			pData = (const char *)Unpacker.GetRaw(PartSize);
 
-			if(Unpacker.Error())
+			if(Unpacker.Error() || NumParts < 1 || NumParts > CSnapshot::MAX_PARTS || Part < 0 || Part >= NumParts || PartSize < 0 || PartSize > MAX_SNAPSHOT_PACKSIZE)
 				return;
 
 			if(GameTick >= m_CurrentRecvTick)
@@ -1298,7 +1298,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 
 					if(CompleteSize)
 					{
-						int IntSize = CVariableInt::Decompress(m_aSnapshotIncommingData, CompleteSize, aTmpBuffer2);
+						int IntSize = CVariableInt::Decompress(m_aSnapshotIncommingData, CompleteSize, aTmpBuffer2, sizeof(aTmpBuffer2));
 
 						if(IntSize < 0) // failure during decompression, bail
 							return;
@@ -2325,6 +2325,11 @@ static CClient *CreateClient()
 	return new(pClient) CClient;
 }
 
+void CClient::HandleTeeworldsConnectLink(const char *pConLink)
+{
+	str_copy(m_aCmdConnect, pConLink, sizeof(m_aCmdConnect));
+}
+
 /*
 	Server Time
 	Client Mirror Time
@@ -2337,14 +2342,8 @@ static CClient *CreateClient()
 		Upstream latency
 */
 
-#if defined(CONF_PLATFORM_MACOSX)
-extern "C" int SDL_main(int argc, char **argv_) // ignore_convention
-{
-	const char **argv = const_cast<const char **>(argv_);
-#else
 int main(int argc, const char **argv) // ignore_convention
 {
-#endif
 #if defined(CONF_FAMILY_WINDOWS)
 	for(int i = 1; i < argc; i++) // ignore_convention
 	{
@@ -2436,7 +2435,24 @@ int main(int argc, const char **argv) // ignore_convention
 
 		// parse the command line arguments
 		if(argc > 1) // ignore_convention
-			pConsole->ParseArguments(argc-1, &argv[1]); // ignore_convention
+		{
+			switch(argc) // ignore_convention
+			{
+			case 2:
+			{
+				// handle Teeworlds connect link
+				const int Length = str_length(pClient->m_pConLinkIdentifier);
+				if(str_comp_num(pClient->m_pConLinkIdentifier, argv[1], Length) == 0) // ignore_convention
+				{
+					pClient->HandleTeeworldsConnectLink(argv[1] + Length); // ignore_convention
+					break;
+				}
+			}
+			default:
+				pConsole->ParseArguments(argc - 1, &argv[1]); // ignore_convention
+			}
+
+		}
 	}
 
 	// restore empty config strings to their defaults

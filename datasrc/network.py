@@ -4,6 +4,7 @@ Pickups = Enum("PICKUP", ["HEALTH", "ARMOR", "GRENADE", "SHOTGUN", "LASER", "NIN
 Emotes = Enum("EMOTE", ["NORMAL", "PAIN", "HAPPY", "SURPRISE", "ANGRY", "BLINK"])
 Emoticons = Enum("EMOTICON", ["OOP", "EXCLAMATION", "HEARTS", "DROP", "DOTDOT", "MUSIC", "SORRY", "GHOST", "SUSHI", "SPLATTEE", "DEVILTEE", "ZOMG", "ZZZ", "WTF", "EYES", "QUESTION"])
 Votes = Enum("VOTE", ["UNKNOWN", "START_OP", "START_KICK", "START_SPEC", "END_ABORT", "END_PASS", "END_FAIL"])
+ChatModes = Enum("CHAT", ["NONE", "ALL", "TEAM", "WHISPER"])
 
 PlayerFlags = Flags("PLAYERFLAG", ["ADMIN", "CHATTING", "SCOREBOARD", "READY", "DEAD", "WATCHING"])
 GameFlags = Flags("GAMEFLAG", ["TEAMS", "FLAGS", "SURVIVAL"])
@@ -37,7 +38,11 @@ enum
 	FLAG_ATSTAND,
 	FLAG_TAKEN,
 
-	SPEC_FREEVIEW=-1,
+	SPEC_FREEVIEW=0,
+	SPEC_PLAYER,
+	SPEC_FLAGRED,
+	SPEC_FLAGBLUE,
+	NUM_SPECMODES,
 };
 '''
 
@@ -51,6 +56,7 @@ Enums = [
 	Emotes,
 	Emoticons,
 	Votes,
+	ChatModes,
 	GameMsgIDs,
 ]
 
@@ -147,6 +153,8 @@ Objects = [
 
 		NetIntAny("m_HookX"),
 		NetIntAny("m_HookY"),
+		NetIntAny("m_HookDx"),
+		NetIntAny("m_HookDy"),
 	]),
 
 	NetObject("Character:CharacterCore", [
@@ -166,7 +174,8 @@ Objects = [
 	]),
 
 	NetObject("SpectatorInfo", [
-		NetIntRange("m_SpectatorID", 'SPEC_FREEVIEW', 'MAX_CLIENTS-1'),
+		NetIntRange("m_SpecMode", 0, 'NUM_SPECMODES-1'),
+		NetIntRange("m_SpectatorID", -1, 'MAX_CLIENTS-1'),
 		NetIntAny("m_X"),
 		NetIntAny("m_Y"),
 	]),
@@ -235,7 +244,7 @@ Messages = [
 	]),
 
 	NetMessage("Sv_Chat", [
-		NetIntRange("m_Team", 'TEAM_SPECTATORS', 'TEAM_BLUE'),
+		NetIntRange("m_Mode", 0, 'NUM_CHATS-1'),
 		NetIntRange("m_ClientID", -1, 'MAX_CLIENTS-1'),
 		NetStringStrict("m_pMessage"),
 	]),
@@ -347,7 +356,8 @@ Messages = [
 
 	### Client messages
 	NetMessage("Cl_Say", [
-		NetBool("m_Team"),
+		NetIntRange("m_Mode", 0, 'NUM_CHATS-1'),
+		NetIntRange("m_Target", -1, 'MAX_CLIENTS-1'),
 		NetStringStrict("m_pMessage"),
 	]),
 
@@ -356,7 +366,8 @@ Messages = [
 	]),
 
 	NetMessage("Cl_SetSpectatorMode", [
-		NetIntRange("m_SpectatorID", 'SPEC_FREEVIEW', 'MAX_CLIENTS-1'),
+		NetIntRange("m_SpecMode", 0, 'NUM_SPECMODES-1'),
+		NetIntRange("m_SpectatorID", -1, 'MAX_CLIENTS-1'),
 	]),
 
 	NetMessage("Cl_StartInfo", [

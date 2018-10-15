@@ -673,7 +673,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	BottomView.HSplitTop(20.f, 0, &BottomView);
 
 	// render game menu backgrounds
-	int NumOptions = g_Config.m_ClNameplates ? 8 : 5;
+	int NumOptions = g_Config.m_ClNameplates ? 9 : 6;
 	float ButtonHeight = 20.0f;
 	float Spacing = 2.0f;
 	float BackgroundHeight = (float)(NumOptions+1)*ButtonHeight+(float)NumOptions*Spacing;
@@ -683,7 +683,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	RenderTools()->DrawUIRect(&Game, vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_ALL, 5.0f);
 
 	// render client menu background
-	NumOptions = 2;
+	NumOptions = 3;
 	if(g_Config.m_ClAutoDemoRecord) NumOptions += 1;
 	if(g_Config.m_ClAutoScreenshot) NumOptions += 1;
 	BackgroundHeight = (float)(NumOptions+1)*ButtonHeight+(float)NumOptions*Spacing;
@@ -736,6 +736,12 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 
 	Game.HSplitTop(Spacing, 0, &Game);
 	Game.HSplitTop(ButtonHeight, &Button, &Game);
+	static int s_Showsocial = 0;
+	if(DoButton_CheckBox(&s_Showsocial, Localize("Show social"), g_Config.m_ClShowsocial, &Button))
+		g_Config.m_ClShowsocial ^= 1;
+
+	Game.HSplitTop(Spacing, 0, &Game);
+	Game.HSplitTop(ButtonHeight, &Button, &Game);
 	static int s_Nameplates = 0;
 	if(DoButton_CheckBox(&s_Nameplates, Localize("Show name plates"), g_Config.m_ClNameplates, &Button))
 		g_Config.m_ClNameplates ^= 1;
@@ -766,6 +772,12 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	Client.HSplitTop(ButtonHeight, &Label, &Client);
 	Label.y += 2.0f;
 	UI()->DoLabel(&Label, Localize("Client"), ButtonHeight*ms_FontmodHeight*0.8f, CUI::ALIGN_CENTER);
+
+	Client.HSplitTop(Spacing, 0, &Client);
+	Client.HSplitTop(ButtonHeight, &Button, &Client);
+	static int s_SkipMainMenu = 0;
+	if(DoButton_CheckBox(&s_SkipMainMenu, Localize("Skip the main menu"), g_Config.m_ClSkipStartMenu, &Button))
+		g_Config.m_ClSkipStartMenu ^= 1;
 
 	Client.HSplitTop(Spacing, 0, &Client);
 	Client.HSplitTop(ButtonHeight, &Button, &Client);
@@ -1178,7 +1190,7 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 
 	// render screen menu background
 	int NumOptions = g_Config.m_GfxFullscreen ? 3 : 4;
-	if(Graphics()->GetNumScreens() == 1)
+	if(Graphics()->GetNumScreens() > 1)
 		++NumOptions;
 	float ButtonHeight = 20.0f;
 	float Spacing = 2.0f;

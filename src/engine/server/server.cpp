@@ -35,7 +35,7 @@
 	#include <windows.h>
 #endif
 
-static const char *StrLtrim(const char *pStr)
+/*static const char *StrLtrim(const char *pStr)
 {
 	while(*pStr && *pStr >= 0 && *pStr <= 32)
 		pStr++;
@@ -52,7 +52,7 @@ static void StrRtrim(char *pStr)
 		pStr[i] = 0;
 		i--;
 	}
-}
+}*/
 
 
 CSnapIDPool::CSnapIDPool()
@@ -608,10 +608,10 @@ void CServer::DoSnapshot()
 				const int MaxSize = MAX_SNAPSHOT_PACKSIZE;
 				int NumPackets;
 
-				SnapshotSize = CVariableInt::Compress(aDeltaData, DeltaSize, aCompData);
+				SnapshotSize = CVariableInt::Compress(aDeltaData, DeltaSize, aCompData, sizeof(aCompData));
 				NumPackets = (SnapshotSize+MaxSize-1)/MaxSize;
 
-				for(int n = 0, Left = SnapshotSize; Left; n++)
+				for(int n = 0, Left = SnapshotSize; Left > 0; n++)
 				{
 					int Chunk = Left < MaxSize ? Left : MaxSize;
 					Left -= Chunk;
@@ -811,6 +811,8 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 					m_NetServer.Drop(ClientID, "Wrong password");
 					return;
 				}
+
+				m_aClients[ClientID].m_Version = Unpacker.GetInt();
 
 				m_aClients[ClientID].m_State = CClient::STATE_CONNECTING;
 				SendMap(ClientID);
@@ -1128,10 +1130,8 @@ void CServer::PumpNetwork()
 	{
 		if(Packet.m_Flags&NETSENDFLAG_CONNLESS)
 		{
-			// stateless?
-			if(!(Packet.m_Flags&NETSENDFLAG_STATELESS))
-				if(m_Register.RegisterProcessPacket(&Packet, ResponseToken))
-					continue;
+			if(m_Register.RegisterProcessPacket(&Packet, ResponseToken))
+				continue;
 			if(Packet.m_DataSize >= int(sizeof(SERVERBROWSE_GETINFO)) &&
 				mem_comp(Packet.m_pData, SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO)) == 0)
 			{
@@ -1249,7 +1249,7 @@ int CServer::Run()
 		BindAddr.port = g_Config.m_SvPort;
 	}
 
-	if(!m_NetServer.Open(BindAddr, &m_ServerBan, g_Config.m_SvMaxClients, g_Config.m_SvMaxClientsPerIP, NETCREATE_FLAG_ALLOWSTATELESS))
+	if(!m_NetServer.Open(BindAddr, &m_ServerBan, g_Config.m_SvMaxClients, g_Config.m_SvMaxClientsPerIP, 0))
 	{
 		dbg_msg("server", "couldn't open socket. port %d might already be in use", g_Config.m_SvPort);
 		return -1;
@@ -1441,8 +1441,8 @@ void CServer::ConStatus(IConsole::IResult *pResult, void *pUser)
 			{
 				const char *pAuthStr = pThis->m_aClients[i].m_Authed == CServer::AUTHED_ADMIN ? "(Admin)" :
 										pThis->m_aClients[i].m_Authed == CServer::AUTHED_MOD ? "(Mod)" : "";
-				str_format(aBuf, sizeof(aBuf), "id=%d addr=%s name='%s' score=%d %s", i, aAddrStr,
-					pThis->m_aClients[i].m_aName, pThis->m_aClients[i].m_Score, pAuthStr);
+				str_format(aBuf, sizeof(aBuf), "id=%d addr=%s client=%x name='%s' score=%d %s", i, aAddrStr,
+					pThis->m_aClients[i].m_Version, pThis->m_aClients[i].m_aName, pThis->m_aClients[i].m_Score, pAuthStr);
 			}
 			else
 				str_format(aBuf, sizeof(aBuf), "id=%d addr=%s connecting", i, aAddrStr);

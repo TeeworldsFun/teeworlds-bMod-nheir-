@@ -194,50 +194,51 @@ void CGameContext::CreateSound(vec2 Pos, int Sound, int Mask)
 	}
 }
 
-
-void CGameContext::SendChatTarget(int To, const char *pText)
-{
-	CNetMsg_Sv_Chat Msg;
-	Msg.m_Team = 0;
-	Msg.m_ClientID = -1;
-	Msg.m_pMessage = pText;
-	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, To);
-}
-
-
-void CGameContext::SendChat(int ChatterClientID, int Team, const char *pText)
+void CGameContext::SendChat(int ChatterClientID, int Mode, int To, const char *pText)
 {
 	char aBuf[256];
 	if(ChatterClientID >= 0 && ChatterClientID < MAX_CLIENTS)
-		str_format(aBuf, sizeof(aBuf), "%d:%d:%s: %s", ChatterClientID, Team, Server()->ClientName(ChatterClientID), pText);
+		str_format(aBuf, sizeof(aBuf), "%d:%d:%s: %s", ChatterClientID, Mode, Server()->ClientName(ChatterClientID), pText);
 	else
 		str_format(aBuf, sizeof(aBuf), "*** %s", pText);
-	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, Team!=CHAT_ALL?"teamchat":"chat", aBuf);
 
-	if(Team == CHAT_ALL)
-	{
-		CNetMsg_Sv_Chat Msg;
-		Msg.m_Team = 0;
-		Msg.m_ClientID = ChatterClientID;
-		Msg.m_pMessage = pText;
-		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
-	}
+	char aBufMode[32];
+	if(Mode == CHAT_WHISPER)
+		str_copy(aBufMode, "whisper", sizeof(aBufMode));
+	else if(Mode == CHAT_TEAM)
+		str_copy(aBufMode, "teamchat", sizeof(aBufMode));
 	else
-	{
-		CNetMsg_Sv_Chat Msg;
-		Msg.m_Team = 1;
-		Msg.m_ClientID = ChatterClientID;
-		Msg.m_pMessage = pText;
+		str_copy(aBufMode, "chat", sizeof(aBufMode));
 
+	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, aBufMode, aBuf);
+
+
+	CNetMsg_Sv_Chat Msg;
+	Msg.m_Mode = Mode;
+	Msg.m_ClientID = ChatterClientID;
+	Msg.m_pMessage = pText;
+
+	if(Mode == CHAT_ALL)
+		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
+	else if(Mode == CHAT_TEAM)
+	{
 		// pack one for the recording only
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_NOSEND, -1);
+
+		To = m_apPlayers[ChatterClientID]->GetTeam();
 
 		// send to the clients
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() == Team)
+			if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() == To)
 				Server()->SendPackMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_NORECORD, i);
 		}
+	}
+	else // Mode == CHAT_WHISPER
+	{
+		// send to the clients
+		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ChatterClientID);
+		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, To);
 	}
 }
 
@@ -742,7 +743,6 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 				return;
 
 			CNetMsg_Cl_Say *pMsg = (CNetMsg_Cl_Say *)pRawMsg;
-			int Team = pMsg->m_Team ? pPlayer->GetTeam() : CGameContext::CHAT_ALL;
 
 			// trim right and set maximum length to 128 utf8-characters
 			int Length = 0;
@@ -779,13 +779,20 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			pPlayer->m_LastChat = Server()->Tick();
 
 			// don't allow spectators to disturb players during a running game in tournament mode
+			int Mode = pMsg->m_Mode;
 			if((g_Config.m_SvTournamentMode == 2) &&
 				pPlayer->GetTeam() == TEAM_SPECTATORS &&
 				m_pController->IsGameRunning() &&
 				!Server()->IsAuthed(ClientID))
-				Team = TEAM_SPECTATORS;
+			{
+				if(Mode != CHAT_WHISPER)
+					Mode = CHAT_TEAM;
+				else if(m_apPlayers[pMsg->m_Target] && m_apPlayers[pMsg->m_Target]->GetTeam() != TEAM_SPECTATORS)
+					Mode = CHAT_NONE;
+			}
 
-			SendChat(ClientID, Team, pMsg->m_pMessage);
+			if(Mode != CHAT_NONE)
+				SendChat(ClientID, Mode, pMsg->m_Target, pMsg->m_pMessage);
 		}
 		else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
 		{
@@ -951,7 +958,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 				return;
 
 			pPlayer->m_LastSetSpectatorMode = Server()->Tick();
-			if(!pPlayer->SetSpectatorID(pMsg->m_SpectatorID))
+			if(!pPlayer->SetSpectatorID(pMsg->m_SpecMode, pMsg->m_SpectatorID))
 				SendGameMsg(GAMEMSG_SPEC_INVALIDID, ClientID);
 		}
 		else if (MsgID == NETMSGTYPE_CL_EMOTICON && !m_World.m_Paused)
@@ -1106,7 +1113,7 @@ void CGameContext::ConRestart(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSay(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	pSelf->SendChat(-1, CGameContext::CHAT_ALL, pResult->GetString(0));
+	pSelf->SendChat(-1, CHAT_ALL, -1, pResult->GetString(0));
 }
 
 void CGameContext::ConSetTeam(IConsole::IResult *pResult, void *pUserData)
@@ -1372,6 +1379,17 @@ void CGameContext::ConchainSettingUpdate(IConsole::IResult *pResult, void *pUser
 	}
 }
 
+void CGameContext::ConchainGameinfoUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	pfnCallback(pResult, pCallbackUserData);
+	if(pResult->NumArguments())
+	{
+		CGameContext *pSelf = (CGameContext *)pUserData;
+		if(pSelf->m_pController)
+			pSelf->m_pController->CheckGameInfo();
+	}
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1404,6 +1422,10 @@ void CGameContext::OnConsoleInit()
 	Console()->Chain("sv_vote_spectate", ConchainSettingUpdate, this);
 	Console()->Chain("sv_teambalance_time", ConchainSettingUpdate, this);
 	Console()->Chain("sv_spectator_slots", ConchainSettingUpdate, this);
+
+	Console()->Chain("sv_scorelimit", ConchainGameinfoUpdate, this);
+	Console()->Chain("sv_timelimit", ConchainGameinfoUpdate, this);
+	Console()->Chain("sv_matches_per_map", ConchainGameinfoUpdate, this);
 }
 
 void CGameContext::OnInit()

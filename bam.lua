@@ -8,7 +8,7 @@ Import("other/freetype/freetype.lua")
 config = NewConfig()
 config:Add(OptCCompiler("compiler"))
 config:Add(OptTestCompileC("stackprotector", "int main(){return 0;}", "-fstack-protector -fstack-protector-all"))
-config:Add(OptTestCompileC("minmacosxsdk", "int main(){return 0;}", "-mmacosx-version-min=10.5 -isysroot /Developer/SDKs/MacOSX10.5.sdk"))
+config:Add(OptTestCompileC("minmacosxsdk", "int main(){return 0;}", "-mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk"))
 config:Add(OptLibrary("zlib", "zlib.h", false))
 config:Add(SDL.OptFind("sdl", true))
 config:Add(FreeType.OptFind("freetype", true))
@@ -76,7 +76,7 @@ function ContentCompile(action, output)
 end
 
 
-function GenerateCommonSettings(settings)
+function GenerateCommonSettings(settings, conf, arch, compiler)
 	if compiler == "gcc" or compiler == "clang" then
 		settings.cc.flags:Add("-Wall", "-fno-exceptions")
 	end
@@ -102,7 +102,7 @@ function GenerateCommonSettings(settings)
 	libs = {zlib=zlib, wavpack=wavpack, png=png, md5=md5, json=json}
 end
 
-function GenerateMacOSXSettings(settings, conf, arch)
+function GenerateMacOSXSettings(settings, conf, arch, compiler)
 	if arch == "x86" then
 		settings.cc.flags:Add("-arch i386")
 		settings.link.flags:Add("-arch i386")
@@ -120,17 +120,17 @@ function GenerateMacOSXSettings(settings, conf, arch)
 		os.exit(1)
 	end
 
-	settings.cc.flags:Add("-mmacosx-version-min=10.5")
-	settings.link.flags:Add("-mmacosx-version-min=10.5")
+	settings.cc.flags:Add("-mmacosx-version-min=10.6")
+	settings.link.flags:Add("-mmacosx-version-min=10.6")
 	if config.minmacosxsdk.value == 1 then
-		settings.cc.flags:Add("-isysroot /Developer/SDKs/MacOSX10.5.sdk")
-		settings.link.flags:Add("-isysroot /Developer/SDKs/MacOSX10.5.sdk")
+		settings.cc.flags:Add("-isysroot /Developer/SDKs/MacOSX10.6.sdk")
+		settings.link.flags:Add("-isysroot /Developer/SDKs/MacOSX10.6.sdk")
 	end
 
 	settings.link.frameworks:Add("Carbon")
 	settings.link.frameworks:Add("AppKit")
 
-	GenerateCommonSettings(settings, conf, arch)
+	GenerateCommonSettings(settings, conf, arch, compiler)
 
 	-- Build server launcher before adding game stuff
 	local serverlaunch = Link(settings, "serverlaunch", Compile(settings, "src/osxlaunch/server.m"))
@@ -154,27 +154,28 @@ function GenerateMacOSXSettings(settings, conf, arch)
 	settings.link.frameworks:Add("AGL")
 	-- FIXME: the SDL config is applied in BuildClient too but is needed here before so the launcher will compile
 	config.sdl:Apply(settings)
-	settings.link.extrafiles:Merge(Compile(settings, "src/osxlaunch/client.m"))
 	BuildClient(settings)
 
 	-- Content
 	BuildContent(settings)
 end
 
-function GenerateLinuxSettings(settings, conf, arch)
+function GenerateLinuxSettings(settings, conf, arch, compiler)
 	if arch == "x86" then
 		settings.cc.flags:Add("-m32")
 		settings.link.flags:Add("-m32")
 	elseif arch == "x86_64" then
 		settings.cc.flags:Add("-m64")
 		settings.link.flags:Add("-m64")
+	elseif arch == "armv7l" then
+		-- arm 32 bit
 	else
 		print("Unknown Architecture '" .. arch .. "'. Supported: x86, x86_64")
 		os.exit(1)
 	end
 	settings.link.libs:Add("pthread")
 
-	GenerateCommonSettings(settings, conf, arch)
+	GenerateCommonSettings(settings, conf, arch, compiler)
 
 	-- Master server, version server and tools
 	BuildEngineCommon(settings)
@@ -198,11 +199,11 @@ function GenerateLinuxSettings(settings, conf, arch)
 	BuildContent(settings)
 end
 
-function GenerateSolarisSettings(settings, conf, arch)
+function GenerateSolarisSettings(settings, conf, arch, compiler)
 	settings.link.libs:Add("socket")
 	settings.link.libs:Add("nsl")
 
-	GenerateLinuxSettings(settings, conf, arch)
+	GenerateLinuxSettings(settings, conf, arch, compiler)
 end
 
 function GenerateWindowsSettings(settings, conf, target_arch, compiler)
@@ -234,7 +235,7 @@ function GenerateWindowsSettings(settings, conf, target_arch, compiler)
 	settings.link.libs:Add("shell32")
 	settings.link.libs:Add("advapi32")
 
-	GenerateCommonSettings(settings, conf, target_arch)
+	GenerateCommonSettings(settings, conf, target_arch, compiler)
 
 	-- Master server, version server and tools
 	BuildEngineCommon(settings)
@@ -376,6 +377,8 @@ function GenerateSettings(conf, arch, builddir, compiler)
 	elseif compiler == "cl" then
 		SetDriversCL(settings)
 	else
+		-- apply compiler settings
+		config.compiler:Apply(settings)
 		compiler = config.compiler.driver
 	end
 	
@@ -409,11 +412,11 @@ function GenerateSettings(conf, arch, builddir, compiler)
 		GenerateWindowsSettings(settings, conf, arch, compiler)
 	elseif family == "unix" then
 		if platform == "macosx" then
-			GenerateMacOSXSettings(settings, conf, arch)
+			GenerateMacOSXSettings(settings, conf, arch, compiler)
 		elseif platform == "solaris" then
-			GenerateSolarisSettings(settings, conf, arch)
+			GenerateSolarisSettings(settings, conf, arch, compiler)
 		else -- Linux, BSD
-			GenerateLinuxSettings(settings, conf, arch)
+			GenerateLinuxSettings(settings, conf, arch, compiler)
 		end
 	end
 

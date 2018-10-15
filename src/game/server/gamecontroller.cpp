@@ -461,17 +461,7 @@ void IGameController::ResetGame()
 	m_GameStartTick = Server()->Tick();
 	m_SuddenDeath = 0;
 
-	int MatchNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvMatchesPerMap) ? g_Config.m_SvMatchesPerMap : 0;
-	if(MatchNum == 0)
-		m_MatchCount = 0;
-	bool GameInfoChanged = (m_GameInfo.m_MatchCurrent != m_MatchCount+1) || (m_GameInfo.m_MatchNum != MatchNum) ||
-							(m_GameInfo.m_ScoreLimit != g_Config.m_SvScorelimit) || (m_GameInfo.m_TimeLimit != g_Config.m_SvTimelimit);
-	m_GameInfo.m_MatchCurrent = m_MatchCount+1;
-	m_GameInfo.m_MatchNum = MatchNum;
-	m_GameInfo.m_ScoreLimit = g_Config.m_SvScorelimit;
-	m_GameInfo.m_TimeLimit = g_Config.m_SvTimelimit;
-	if(GameInfoChanged)
-		UpdateGameInfo(-1);
+	CheckGameInfo();
 
 	// do team-balancing
 	DoTeamBalance();
@@ -802,6 +792,21 @@ void IGameController::Tick()
 }
 
 // info
+void IGameController::CheckGameInfo()
+{
+	int MatchNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvMatchesPerMap) ? g_Config.m_SvMatchesPerMap : 0;
+	if(MatchNum == 0)
+		m_MatchCount = 0;
+	bool GameInfoChanged = (m_GameInfo.m_MatchCurrent != m_MatchCount + 1) || (m_GameInfo.m_MatchNum != MatchNum) ||
+		(m_GameInfo.m_ScoreLimit != g_Config.m_SvScorelimit) || (m_GameInfo.m_TimeLimit != g_Config.m_SvTimelimit);
+	m_GameInfo.m_MatchCurrent = m_MatchCount + 1;
+	m_GameInfo.m_MatchNum = MatchNum;
+	m_GameInfo.m_ScoreLimit = g_Config.m_SvScorelimit;
+	m_GameInfo.m_TimeLimit = g_Config.m_SvTimelimit;
+	if(GameInfoChanged)
+		UpdateGameInfo(-1);
+}
+
 bool IGameController::IsFriendlyFire(int ClientID1, int ClientID2) const
 {
 	if(ClientID1 == ClientID2)
@@ -1113,21 +1118,24 @@ void IGameController::DoTeamChange(CPlayer *pPlayer, int Team, bool DoChatMsg)
 	}
 	OnPlayerInfoChange(pPlayer);
 	GameServer()->OnClientTeamChange(ClientID);
+
+	// reset inactivity counter when joining the game
+	if(OldTeam == TEAM_SPECTATORS)
+		pPlayer->m_InactivityTickCounter = 0;
 }
 
 int IGameController::GetStartTeam()
 {
-	// this will force the auto balancer to work overtime aswell
-	if(g_Config.m_DbgStress)
-		return TEAM_RED;
-
 	if(g_Config.m_SvTournamentMode)
 		return TEAM_SPECTATORS;
 
 	// determine new team
 	int Team = TEAM_RED;
 	if(IsTeamplay())
-		Team = m_aTeamSize[TEAM_RED] > m_aTeamSize[TEAM_BLUE] ? TEAM_BLUE : TEAM_RED;
+	{
+		if(!g_Config.m_DbgStress)	// this will force the auto balancer to work overtime aswell
+			Team = m_aTeamSize[TEAM_RED] > m_aTeamSize[TEAM_BLUE] ? TEAM_BLUE : TEAM_RED;
+	}
 
 	// check if there're enough player slots left
 	if(m_aTeamSize[TEAM_RED]+m_aTeamSize[TEAM_BLUE] < Server()->MaxClients()-g_Config.m_SvSpectatorSlots)

@@ -65,6 +65,7 @@ class CGameContext : public IGameServer
 	static void ConVote(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainGameinfoUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 	CGameContext(int Resetting);
 	void Construct(int Resetting);
@@ -135,18 +136,8 @@ public:
 	void CreateDeath(vec2 Pos, int Who);
 	void CreateSound(vec2 Pos, int Sound, int Mask=-1);
 
-
-	enum
-	{
-		CHAT_ALL=-2,
-		CHAT_SPEC=-1,
-		CHAT_RED=0,
-		CHAT_BLUE=1
-	};
-
 	// network
-	void SendChatTarget(int To, const char *pText);
-	void SendChat(int ClientID, int Team, const char *pText);
+	void SendChat(int ChatterClientID, int Mode, int To, const char *pText);
 	void SendEmoticon(int ClientID, int Emoticon);
 	void SendWeaponPickup(int ClientID, int Weapon);
 	void SendMotd(int ClientID);

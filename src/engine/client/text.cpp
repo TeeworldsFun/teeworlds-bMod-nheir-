@@ -152,9 +152,8 @@ class CTextRender : public IEngineTextRender
 		{
 			if(pSizeData->m_aTextures[i].IsValid())
 			{
-				Graphics()->UnloadTexture(pSizeData->m_aTextures[i]);
+				Graphics()->UnloadTexture(&(pSizeData->m_aTextures[i]));
 				FontMemoryUsage -= pSizeData->m_TextureWidth*pSizeData->m_TextureHeight;
-				pSizeData->m_aTextures[i] = IGraphics::CTextureHandle();
 			}
 
 			pSizeData->m_aTextures[i] = Graphics()->LoadTextureRaw(Width, Height, CImageInfo::FORMAT_ALPHA, pMem, CImageInfo::FORMAT_ALPHA, IGraphics::TEXLOAD_NOMIPMAPS);
@@ -460,7 +459,7 @@ public:
 	}
 
 
-	virtual CFont *LoadFont(const char *pFilename)
+	virtual int LoadFont(const char *pFilename)
 	{
 		CFont *pFont = (CFont *)mem_alloc(sizeof(CFont), 1);
 
@@ -470,25 +469,16 @@ public:
 		if(FT_New_Face(m_FTLibrary, pFont->m_aFilename, 0, &pFont->m_FtFace))
 		{
 			mem_free(pFont);
-			return NULL;
+			return -1;
 		}
 
 		for(unsigned i = 0; i < NUM_FONT_SIZES; i++)
 			pFont->m_aSizes[i].m_FontSize = -1;
 
 		dbg_msg("textrender", "loaded pFont from '%s'", pFilename);
-		return pFont;
-	};
-
-	virtual void DestroyFont(CFont *pFont)
-	{
-		mem_free(pFont);
-	}
-
-	virtual void SetDefaultFont(CFont *pFont)
-	{
-		dbg_msg("textrender", "default pFont set %p", pFont);
 		m_pDefaultFont = pFont;
+
+		return 0;
 	}
 
 
