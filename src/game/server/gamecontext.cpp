@@ -1551,9 +1551,7 @@ IGameServer *CreateGameServer() { return new CGameContext; }
 void CGameContext::DeleteBot(int i) {
 	if(m_apPlayers[i] && m_apPlayers[i]->m_IsBot) {
 		dbg_msg("context","Delete bot at slot: %d", i);
-		m_pController->OnPlayerDisconnect(m_apPlayers[i]);
-		delete m_apPlayers[i];
-		m_apPlayers[i] = 0;
+		OnClientDrop(i, "Everything is awesome");
 	}
 	Server()->DelBot(i);
 }
@@ -1569,7 +1567,8 @@ bool CGameContext::AddBot(int i) {
 	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
 	Server()->SetClientName(i, g_aBotName[i]);
 	Server()->SetClientClan(i, g_BotClan);
-	m_pController->OnPlayerConnect(m_apPlayers[i]);
+	OnClientEnter(i);
+	//m_pController->OnPlayerConnect(m_apPlayers[i]);
 	return true;
 }
 
