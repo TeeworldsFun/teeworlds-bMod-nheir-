@@ -147,7 +147,7 @@ public:
 
 	virtual void OnReset();
 
-	CNetObj_PlayerInput GetInputData() { Tick(); return m_InputData; };
+	CNetObj_PlayerInput GetInputData() { return m_InputData; };
 	CNetObj_PlayerInput GetLastInputData() { return m_LastData; }
 };
 

@@ -453,13 +453,22 @@ void CGameContext::OnTick()
 	// Check bot number
 	CheckBotNumber();
 
-	// Test basic move for bots
+	// OnPredictedInput for bots
+	if (!m_World.m_Paused) {
+		for(int i = 0; i < MAX_CLIENTS ; i++)
+		{
+			if(!m_apPlayers[i] || !m_apPlayers[i]->IsBot())
+				continue;
+			CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetLastInputData();
+			m_apPlayers[i]->OnPredictedInput(&Input);
+		}
+	}
 	for(int i = 0; i < MAX_CLIENTS ; i++)
 	{
 		if(!m_apPlayers[i] || !m_apPlayers[i]->IsBot())
 			continue;
-		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetLastInputData();
-		m_apPlayers[i]->OnPredictedInput(&Input);
+		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
+		m_apPlayers[i]->OnDirectInput(&Input);
 	}
 
 	// copy tuning
@@ -545,14 +554,6 @@ void CGameContext::OnTick()
 		}
 	}
 
-	// Test basic move for bots
-	for(int i = 0; i < MAX_CLIENTS ; i++)
-	{
-		if(!m_apPlayers[i] || !m_apPlayers[i]->IsBot())
-			continue;
-		CNetObj_PlayerInput Input = m_apPlayers[i]->m_pBot->GetInputData();
-		m_apPlayers[i]->OnDirectInput(&Input);
-	}
 #ifdef CONF_DEBUG
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{

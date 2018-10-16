@@ -47,8 +47,11 @@ CPlayer::~CPlayer()
 
 void CPlayer::Tick()
 {
-	if(!IsDummy() && !IsBot() && !Server()->ClientIngame(m_ClientID))
+	if(!IsDummy() && !Server()->ClientIngame(m_ClientID))
 		return;
+
+	if(IsBot())
+		m_pBot->Tick();
 
 	Server()->SetClientScore(m_ClientID, m_Score);
 
