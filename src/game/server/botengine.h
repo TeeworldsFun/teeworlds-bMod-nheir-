@@ -161,45 +161,45 @@ class CTriangle {
 
 class CVertex {
 public:
-  vec2 m_Pos;
-  int m_Degree;
+	vec2 m_Pos;
+	int m_Degree;
 };
 
 struct CEdge {
-  vec2 m_Start;
-  vec2 m_End;
-  int m_Size;
+	vec2 m_Start;
+	vec2 m_End;
+	int m_Size;
 	int m_SnapID;
 };
 
 class CGraph {
 public:
-  CEdge *m_pEdges;
-  int m_NumEdges;
-  CVertex *m_pVertices;
-  int m_NumVertices;
+	CEdge *m_pEdges;
+	int m_NumEdges;
+	CVertex *m_pVertices;
+	int m_NumVertices;
 
-  int *m_pClosestPath;
+	int *m_pClosestPath;
 
 	int m_Diameter;
 
 	int m_Width;
 
-  CGraph();
-  ~CGraph();
-  void Reset();
-  void Free();
+	CGraph();
+	~CGraph();
+	void Reset();
+	void Free();
 
-  void ComputeClosestPath();
+	void ComputeClosestPath();
 
-  int GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices);
+	int GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 };
 
 class CBotEngine
 {
-  class CGameContext *m_pGameServer;
+	class CGameContext *m_pGameServer;
 protected:
 
 	class CTile *m_pTiles;
@@ -254,17 +254,17 @@ public:
 		int m_MaxSize;
 	} m_aPaths[MAX_CLIENTS];
 
-  int GetWidth() { return m_Width; }
-  CGraph *GetGraph() { return &m_Graph; }
-  vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
+	int GetWidth() { return m_Width; }
+	CGraph *GetGraph() { return &m_Graph; }
+	vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
 
 	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath);
 	int GetPartialPath(vec2 VStart, vec2 VEnd, vec2 *pVertices, int MaxSize);
 	vec2 NextPoint(vec2 Pos, vec2 Target);
 
-  int GetTile(int x, int y);
+	int GetTile(int x, int y);
 	int GetTile(vec2 Pos);
-  int GetTile(int i) { return m_pGrid[i]; };
+	int GetTile(int i) { return m_pGrid[i]; };
 	int FastIntersectLine(int Id1, int Id2);
 	int IntersectSegment(vec2 P1, vec2 P2, vec2 *pPos);
 
@@ -276,7 +276,7 @@ public:
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
 	int ConvertFromIndex(vec2 Pos);
 
-  class CGameContext *GameServer() { return m_pGameServer;}
+	class CGameContext *GameServer() { return m_pGameServer;}
 
 	void Init(class CTile *pTiles, int Width, int Height);
 	void Snap(int SnappingClient);
