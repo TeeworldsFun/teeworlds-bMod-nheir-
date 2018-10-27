@@ -580,8 +580,10 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 
 	// Accuracy
-	// float Angle = angle(m_Target) + (random_int()%64-32)*pi / 1024.0f;
-	// m_Target = direction(Angle)*length(m_Target);
+	if (g_Config.m_SvBotAccuracyError) {
+		float Angle = angle(m_Target) + (random_int()%64-32)*pi / 1024.0f;
+		m_Target = direction(Angle)*length(m_Target);
+	}
 }
 
 void CBot::UpdateEdge()
