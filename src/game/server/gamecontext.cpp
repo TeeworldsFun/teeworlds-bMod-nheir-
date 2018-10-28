@@ -1600,35 +1600,40 @@ bool CGameContext::ReplacePlayerByBot(int ClientID) {
 void CGameContext::CheckBotNumber() {
 	int BotNumber = 0;
 	int PlayerCount = 0;
-	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
-		if(!m_apPlayers[i])
+	int ClientCount = 0;
+	for (int i = 0 ; i < MAX_CLIENTS ; ++i) {
+		if (!m_apPlayers[i])
 			continue;
-		if(m_apPlayers[i]->IsBot())
+		if (m_apPlayers[i]->IsBot())
 			BotNumber++;
-		else
-			PlayerCount++;
+		else {
+			if (m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS)
+				PlayerCount++;
+			ClientCount++;
+		}
 	}
-	if(!PlayerCount)
+	if(!ClientCount)
 		BotNumber += g_Config.m_SvBotSlots;
+	int MaxBotSlots = min(g_Config.m_SvBotSlots, Server()->MaxClients() - g_Config.m_SvSpectatorSlots - PlayerCount);
 	// Remove bot excedent
-	if(BotNumber-g_Config.m_SvBotSlots > 0)	{
+	if (BotNumber - MaxBotSlots > 0)	{
 		int FirstBot = 0;
-		for(int i = 0 ; i < BotNumber-g_Config.m_SvBotSlots ; i++) {
-			for(; FirstBot < MAX_CLIENTS ; FirstBot++)
-				if(m_apPlayers[FirstBot] && m_apPlayers[FirstBot]->IsBot())
+		for (int i = 0 ; i < BotNumber - MaxBotSlots ; i++) {
+			for (; FirstBot < MAX_CLIENTS ; FirstBot++)
+				if (m_apPlayers[FirstBot] && m_apPlayers[FirstBot]->IsBot())
 					break;
-			if(FirstBot < MAX_CLIENTS)
+			if (FirstBot < MAX_CLIENTS)
 				DeleteBot(FirstBot);
 		}
 	}
 	// Add missing bot if possible
-	if(g_Config.m_SvBotSlots-BotNumber > 0) {
+	if (MaxBotSlots - BotNumber > 0) {
 		int LastFreeSlot = Server()->MaxClients()-1;
-		for(int i = 0 ; i < g_Config.m_SvBotSlots-BotNumber ; i++) {
-			for(; LastFreeSlot >= 0 ; LastFreeSlot--)
+		for (int i = 0 ; i < MaxBotSlots - BotNumber ; i++) {
+			for (; LastFreeSlot >= 0 ; LastFreeSlot--)
 				if(!m_apPlayers[LastFreeSlot])
 					break;
-			if( LastFreeSlot >= 0)
+			if (LastFreeSlot >= 0)
 				AddBot(LastFreeSlot);
 		}
 	}
