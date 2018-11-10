@@ -152,7 +152,8 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, int MaxDamag
 		if(l)
 			Force = normalize(Diff) * MaxForce;
 		float Factor = 1 - clamp((l-InnerRadius)/(Radius-InnerRadius), 0.0f, 1.0f);
-		apEnts[i]->TakeDamage(Force * Factor, (int)(Factor * MaxDamage), Owner, Weapon);
+		if((int)(Factor * MaxDamage))
+			apEnts[i]->TakeDamage(Force * Factor, (int)(Factor * MaxDamage), Owner, Weapon);
 	}
 }
 
@@ -773,8 +774,8 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			if(pEnd != 0)
 				*(const_cast<char *>(pEnd)) = 0;
 
-			// drop empty and autocreated spam messages (more than 16 characters per second)
-			if(Length == 0 || (g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed()*((15+Length)/16) > Server()->Tick()))
+			// drop empty and autocreated spam messages (more than 20 characters per second)
+			if(Length == 0 || (g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat + Server()->TickSpeed()*(Length/20) > Server()->Tick()))
 				return;
 
 			pPlayer->m_LastChat = Server()->Tick();

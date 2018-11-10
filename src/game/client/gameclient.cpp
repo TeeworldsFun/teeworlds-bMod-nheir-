@@ -223,6 +223,7 @@ void CGameClient::OnConsoleInit()
 	m_Input.Add(m_pBinds);
 
 	// add the some console commands
+	Console()->Register("team", "i", CFGFLAG_CLIENT, ConTeam, this, "Switch team");
 	Console()->Register("kill", "", CFGFLAG_CLIENT, ConKill, this, "Kill yourself");
 	Console()->Register("ready_change", "", CFGFLAG_CLIENT, ConReadyChange, this, "Change ready state");
 
@@ -495,6 +496,10 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 	else if(MsgId == NETMSGTYPE_SV_GAMEMSG)
 	{
 		int GameMsgID = pUnpacker->GetInt();
+
+		// check for valid gamemsgid
+		if(GameMsgID < 0 || GameMsgID >= NUM_GAMEMSGS)
+			return;
 
 		int aParaI[3];
 		int NumParaI = 0;
@@ -772,7 +777,11 @@ void CGameClient::OnStateChange(int NewState, int OldState)
 		m_All.m_paComponents[i]->OnStateChange(NewState, OldState);
 }
 
-void CGameClient::OnShutdown() {}
+void CGameClient::OnShutdown()
+{
+	for(int i = 0; i < m_All.m_Num; i++)
+		m_All.m_paComponents[i]->OnShutdown();
+}
 void CGameClient::OnEnterGame() {}
 
 void CGameClient::OnGameOver()
@@ -1430,6 +1439,23 @@ void CGameClient::SendReadyChange()
 {
 	CNetMsg_Cl_ReadyChange Msg;
 	Client()->SendPackMsg(&Msg, MSGFLAG_VITAL);
+}
+
+void CGameClient::ConTeam(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameClient *pClient = static_cast<CGameClient *>(pUserData);
+	if(pClient->m_LocalClientID == -1)
+		return;
+	CMenus::CSwitchTeamInfo Info;
+	pClient->m_pMenus->GetSwitchTeamInfo(&Info);
+	int Team = pResult->GetInteger(0);
+	if(pClient->m_aClients[pClient->m_LocalClientID].m_Team == Team || (Team == TEAM_SPECTATORS && !(Info.m_AllowSpec)) || Info.m_aNotification[0])
+	{
+		if(Info.m_aNotification[0])
+			pClient->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gameclient", Info.m_aNotification);
+		return;
+	}
+	((CGameClient*)pUserData)->SendSwitchTeam(Team);
 }
 
 void CGameClient::ConKill(IConsole::IResult *pResult, void *pUserData)

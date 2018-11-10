@@ -72,7 +72,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 
 	if(m_SeekBarActivatedTime < time_get() - 5*time_freq())
 		m_SeekBarActive = false;
-	
+
 	if(m_MenuActive)
 	{
 		MainView.HSplitTop(SeekBarHeight, &SeekBar, &ButtonBar);
@@ -170,7 +170,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		else
 			DemoPlayer()->Unpause();
 	}
-	
+
 	if(m_MenuActive)
 	{
 		// do buttons
@@ -181,12 +181,12 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		static CButtonContainer s_PlayPauseButton;
 		if(!pInfo->m_Paused)
 		{
-			if(DoButton_SpriteID(&s_PlayPauseButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_PAUSE, &Button, CUI::CORNER_ALL))
+			if(DoButton_SpriteID(&s_PlayPauseButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_PAUSE, false, &Button, CUI::CORNER_ALL))
 				DemoPlayer()->Pause();
 		}
 		else
 		{
-			if(DoButton_SpriteID(&s_PlayPauseButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_PLAY, &Button, CUI::CORNER_ALL))
+			if(DoButton_SpriteID(&s_PlayPauseButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_PLAY, false, &Button, CUI::CORNER_ALL))
 				DemoPlayer()->Unpause();
 		}
 
@@ -195,7 +195,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		ButtonBar.VSplitLeft(Margins, 0, &ButtonBar);
 		ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 		static CButtonContainer s_ResetButton;
-		if(DoButton_SpriteID(&s_ResetButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_STOP, &Button, CUI::CORNER_ALL))
+		if(DoButton_SpriteID(&s_ResetButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_STOP, false, &Button, CUI::CORNER_ALL))
 		{
 			m_pClient->OnReset();
 			DemoPlayer()->Pause();
@@ -206,14 +206,14 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		ButtonBar.VSplitLeft(Margins, 0, &ButtonBar);
 		ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 		static CButtonContainer s_SlowDownButton;
-		if(DoButton_SpriteID(&s_SlowDownButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_SLOWER, &Button, CUI::CORNER_ALL))
+		if(DoButton_SpriteID(&s_SlowDownButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_SLOWER, false, &Button, CUI::CORNER_ALL))
 			DecreaseDemoSpeed = true;
 
 		// fastforward
 		ButtonBar.VSplitLeft(Margins, 0, &ButtonBar);
 		ButtonBar.VSplitLeft(ButtonbarHeight, &Button, &ButtonBar);
 		static CButtonContainer s_FastForwardButton;
-		if(DoButton_SpriteID(&s_FastForwardButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_FASTER, &Button, CUI::CORNER_ALL))
+		if(DoButton_SpriteID(&s_FastForwardButton, IMAGE_DEMOBUTTONS, SPRITE_DEMOBUTTON_FASTER, false, &Button, CUI::CORNER_ALL))
 			IncreaseDemoSpeed = true;
 
 		// speed meter
@@ -358,12 +358,12 @@ void CMenus::RenderDemoList(CUIRect MainView)
 	MainView.HSplitTop(230.0f, &ListBox, &MainView);
 
 	static int s_DemoListId = 0;
-	static float s_ScrollValue = 0;
-	UiDoListboxHeader(&ListBox, Localize("Recorded"), 20.0f, 2.0f);
-	UiDoListboxStart(&s_DemoListId, 20.0f, 0, m_lDemos.size(), 1, m_DemolistSelectedIndex, s_ScrollValue);
+	static CListBoxState s_ListBoxState;
+	UiDoListboxHeader(&s_ListBoxState, &ListBox, Localize("Recorded"), 20.0f, 2.0f);
+	UiDoListboxStart(&s_ListBoxState, &s_DemoListId, 20.0f, 0, m_lDemos.size(), 1, m_DemolistSelectedIndex);
 	for(sorted_array<CDemoItem>::range r = m_lDemos.all(); !r.empty(); r.pop_front())
 	{
-		CListboxItem Item = UiDoListboxNextItem((void*)(&r.front()));
+		CListboxItem Item = UiDoListboxNextItem(&s_ListBoxState, (void*)(&r.front()));
 		if(Item.m_Visible)
 		{
 			Item.m_Rect.VSplitLeft(Item.m_Rect.h, &FileIcon, &Item.m_Rect);
@@ -388,7 +388,7 @@ void CMenus::RenderDemoList(CUIRect MainView)
 		}
 	}
 	bool Activated = false;
-	m_DemolistSelectedIndex = UiDoListboxEnd(&s_ScrollValue, &Activated);
+	m_DemolistSelectedIndex = UiDoListboxEnd(&s_ListBoxState, &Activated);
 	DemolistOnUpdate(false);
 
 	// render demo info

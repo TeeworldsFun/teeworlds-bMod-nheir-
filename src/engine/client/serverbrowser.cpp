@@ -95,17 +95,18 @@ void CServerBrowser::Set(const NETADDR &Addr, int SetType, int Token, const CSer
 			}
 		}
 		break;
-	/*else if(Type == SET_FAV_ADD)
-	{
-		if(m_ServerlistType != IServerBrowser::TYPE_FAVORITES)
-			return;
-
-		if(!Find(Addr))
+	case SET_FAV_ADD:
 		{
-			pEntry = Add(Addr);
-			QueueRequest(pEntry);
+			if(!(m_RefreshFlags&IServerBrowser::REFRESHFLAG_INTERNET))
+				return;
+
+			if(!Find(IServerBrowser::TYPE_INTERNET, Addr))
+			{
+				pEntry = Add(IServerBrowser::TYPE_INTERNET, Addr);
+				QueueRequest(pEntry);
+			}
 		}
-	}*/
+		break;
 	case SET_TOKEN:
 		{
 			int Type;
@@ -116,7 +117,7 @@ void CServerBrowser::Set(const NETADDR &Addr, int SetType, int Token, const CSer
 				Type = IServerBrowser::TYPE_INTERNET;
 				pEntry = Find(Type, Addr);
 				if(pEntry && (pEntry->m_InfoState != CServerEntry::STATE_PENDING || Token != pEntry->m_CurrentToken))
-					pEntry = 0;					
+					pEntry = 0;
 			}
 
 			// lan entry
@@ -125,7 +126,7 @@ void CServerBrowser::Set(const NETADDR &Addr, int SetType, int Token, const CSer
 				Type = IServerBrowser::TYPE_LAN;
 				pEntry = Add(Type, Addr);
 			}
-			
+
 			// set info
 			if(pEntry)
 			{
@@ -283,6 +284,10 @@ void CServerBrowser::Refresh(int RefreshFlags)
 	if(RefreshFlags&IServerBrowser::REFRESHFLAG_INTERNET)
 	{
 		// clear out everything
+		for(CServerEntry *pEntry = m_pFirstReqServer; pEntry; pEntry = pEntry->m_pNextReq)
+		{
+			m_pNetClient->PurgeStoredPacket(pEntry->m_TrackID);
+		}
 		m_aServerlist[IServerBrowser::TYPE_INTERNET].Clear();
 		if(m_ActServerlistType == IServerBrowser::TYPE_INTERNET)
 			m_ServerBrowserFilter.Clear();
@@ -291,13 +296,10 @@ void CServerBrowser::Refresh(int RefreshFlags)
 		m_NumRequests = 0;
 
 		m_NeedRefresh = 1;
+		for(int i = 0; i < m_ServerBrowserFavorites.m_NumFavoriteServers; i++)
+			if(m_ServerBrowserFavorites.m_aFavoriteServers[i].m_State >= CServerBrowserFavorites::FAVSTATE_ADDR)
+				Set(m_ServerBrowserFavorites.m_aFavoriteServers[i].m_Addr, SET_FAV_ADD, -1, 0);
 	}
-	/*else if(Type == IServerBrowser::TYPE_FAVORITES)
-	{
-		for(int i = 0; i < m_NumFavoriteServers; i++)
-			if(m_aFavoriteServers[i].m_State >= FAVSTATE_ADDR)
-				Set(m_aFavoriteServers[i].m_Addr, SET_FAV_ADD, -1, 0);
-	}*/
 }
 
 int CServerBrowser::LoadingProgression() const
@@ -330,7 +332,7 @@ void CServerBrowser::AddFavorite(const CServerInfo *pInfo)
 }
 
 void CServerBrowser::RemoveFavorite(const CServerInfo *pInfo)
-{ 
+{
 	if(m_ServerBrowserFavorites.RemoveFavoriteEx(pInfo->m_aHostname, &pInfo->m_NetAddr))
 	{
 		for(int i = 0; i < NUM_TYPES; ++i)
@@ -445,7 +447,29 @@ void CServerBrowser::RemoveRequest(CServerEntry *pEntry)
 	}
 }
 
-void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) const
+void CServerBrowser::CBFTrackPacket(int TrackID, void *pCallbackUser)
+{
+	if(!pCallbackUser)
+		return;
+
+	CServerBrowser *pSelf = (CServerBrowser *)pCallbackUser;
+	CServerEntry *pEntry = pSelf->m_pFirstReqServer;
+	while(1)
+	{
+		if(!pEntry)	// no more entries
+			break;
+
+		if(pEntry->m_TrackID == TrackID)	// got it -> update
+		{
+			pEntry->m_RequestTime = time_get();
+			break;
+		}
+
+		pEntry = pEntry->m_pNextReq;
+	}
+}
+
+void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry)
 {
 	if(g_Config.m_Debug)
 	{
@@ -460,15 +484,18 @@ void CServerBrowser::RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) cons
 	Packer.Reset();
 	Packer.AddRaw(SERVERBROWSE_GETINFO, sizeof(SERVERBROWSE_GETINFO));
 	Packer.AddInt(pEntry ? pEntry->m_CurrentToken : m_CurrentLanToken);
-	
+
 	CNetChunk Packet;
 	Packet.m_ClientID = -1;
 	Packet.m_Address = Addr;
 	Packet.m_Flags = NETSENDFLAG_CONNLESS;
 	Packet.m_DataSize = Packer.Size();
 	Packet.m_pData = Packer.Data();
-
-	m_pNetClient->Send(&Packet);
+	CSendCBData Data;
+	Data.m_pfnCallback = CBFTrackPacket;
+	Data.m_pCallbackUser = this;
+	m_pNetClient->Send(&Packet, NET_TOKEN_NONE, &Data);
+	pEntry->m_TrackID = Data.m_TrackID;
 
 	if(pEntry)
 	{
@@ -495,7 +522,7 @@ void CServerBrowser::SetInfo(int ServerlistType, CServerEntry *pEntry, const CSe
 		pEntry->m_Info.m_Flags |= FLAG_PUREMAP;
 	pEntry->m_Info.m_Favorite = Fav;
 	pEntry->m_Info.m_NetAddr = pEntry->m_Addr;
- 
+
 	m_aServerlist[ServerlistType].m_NumPlayers += pEntry->m_Info.m_NumPlayers;
 
 	pEntry->m_InfoState = CServerEntry::STATE_READY;

@@ -47,7 +47,7 @@ private:
 
 
 	int DoButton_DemoPlayer(CButtonContainer *pBC, const char *pText, const CUIRect *pRect);
-	int DoButton_SpriteID(CButtonContainer *pBC, int ImageID, int SpriteID, const CUIRect *pRect, int Corners=CUI::CORNER_ALL, float r=5.0f, bool Fade=true);
+	int DoButton_SpriteID(CButtonContainer *pBC, int ImageID, int SpriteID, bool Checked, const CUIRect *pRect, int Corners=CUI::CORNER_ALL, float r=5.0f, bool Fade=true);
 	int DoButton_SpriteClean(int ImageID, int SpriteID, const CUIRect *pRect);
 	int DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect, bool Blend=true);
 	int DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, bool Active);
@@ -83,6 +83,7 @@ private:
 	void DoEditBoxOption(void *pID, char *pOption, int OptionLength, const CUIRect *pRect, const char *pStr, float VSplitVal, float *pOffset, bool Hidden=false);
 	void DoScrollbarOption(void *pID, int *pOption, const CUIRect *pRect, const char *pStr, float VSplitVal, int Min, int Max, bool infinite=false);
 	float DoDropdownMenu(void *pID, const CUIRect *pRect, const char *pStr, float HeaderHeight, FDropdownCallback pfnCallback);
+	float DoIndependentDropdownMenu(void *pID, const CUIRect *pRect, const char *pStr, float HeaderHeight, FDropdownCallback pfnCallback, bool* pActive);
 	void DoInfoBox(const CUIRect *pRect, const char *pLable, const char *pValue);
 	//static int ui_do_edit_box(void *id, const CUIRect *rect, char *str, unsigned str_size, float font_size, bool hidden=false);
 
@@ -102,12 +103,32 @@ private:
 		CUIRect m_HitRect;
 	};
 
-	void UiDoListboxHeader(const CUIRect *pRect, const char *pTitle, float HeaderHeight, float Spacing);
-	void UiDoListboxStart(const void *pID, float RowHeight, const char *pBottomText, int NumItems,
-						int ItemsPerRow, int SelectedIndex, float ScrollValue, const CUIRect *pRect=0, bool Background=true);
-	CListboxItem UiDoListboxNextItem(const void *pID, bool Selected = false);
-	CListboxItem UiDoListboxNextRow();
-	int UiDoListboxEnd(float *pScrollValue, bool *pItemActivated);
+	struct CListBoxState
+	{
+		CUIRect m_ListBoxOriginalView;
+		CUIRect m_ListBoxView;
+		float m_ListBoxRowHeight;
+		int m_ListBoxItemIndex;
+		int m_ListBoxSelectedIndex;
+		int m_ListBoxNewSelected;
+		int m_ListBoxDoneEvents;
+		int m_ListBoxNumItems;
+		int m_ListBoxItemsPerRow;
+		float m_ListBoxScrollValue;
+		bool m_ListBoxItemActivated;
+
+		CListBoxState()
+		{
+			m_ListBoxScrollValue = 0;
+		}
+	};
+
+	void UiDoListboxHeader(CListBoxState* pState, const CUIRect *pRect, const char *pTitle, float HeaderHeight, float Spacing);
+	void UiDoListboxStart(CListBoxState* pState, const void *pID, float RowHeight, const char *pBottomText, int NumItems,
+						int ItemsPerRow, int SelectedIndex, const CUIRect *pRect=0, bool Background=true);
+	CListboxItem UiDoListboxNextItem(CListBoxState* pState, const void *pID, bool Selected = false);
+	CListboxItem UiDoListboxNextRow(CListBoxState* pState);
+	int UiDoListboxEnd(CListBoxState* pState, bool *pItemActivated);
 
 	//static void demolist_listdir_callback(const char *name, int is_dir, void *user);
 	//static void demolist_list_callback(const CUIRect *rect, int index, void *user);
@@ -165,6 +186,8 @@ private:
 	int m_MenuPage;
 	int m_BorwserPage;
 	bool m_MenuActive;
+	int m_SidebarTab;
+	bool m_SidebarActive;
 	bool m_UseMouseButtons;
 	vec2 m_MousePos;
 	vec2 m_PrevMousePos;
@@ -347,6 +370,10 @@ private:
 		int m_Filter;
 		class IServerBrowser *m_pServerBrowser;
 
+		static class CServerFilterInfo ms_FilterStandard;
+		static class CServerFilterInfo ms_FilterFavorites;
+		static class CServerFilterInfo ms_FilterAll;
+
 	public:
 
 		enum
@@ -360,7 +387,7 @@ private:
 		int m_SwitchButton;
 
 		CBrowserFilter() {}
-		CBrowserFilter(int Custom, const char* pName, IServerBrowser *pServerBrowser, int Filter, int Ping, int Country, const char* pGametype, const char* pServerAddress);
+		CBrowserFilter(int Custom, const char* pName, IServerBrowser *pServerBrowser);
 		void Switch();
 		bool Extended() const;
 		int Custom() const;
@@ -374,7 +401,8 @@ private:
 		const CServerInfo *SortedGet(int Index) const;
 		const void *ID(int Index) const;
 
-		void GetFilter(class CServerFilterInfo *pFilterInfo);
+		void Reset();
+		void GetFilter(class CServerFilterInfo *pFilterInfo) const;
 		void SetFilter(const class CServerFilterInfo *pFilterInfo);
 	};
 
@@ -382,6 +410,8 @@ private:
 
 	int m_SelectedFilter;
 
+	void LoadFilters();
+	void SaveFilters();
 	void RemoveFilter(int FilterIndex);
 	void Move(bool Up, int Filter);
 
@@ -425,8 +455,6 @@ private:
 		COL_BROWSER_MAP,
 		COL_BROWSER_PLAYERS,
 		COL_BROWSER_PING,
-		COL_BROWSER_FAVORITE,
-		COL_BROWSER_INFO,
 		NUM_BROWSER_COLS,
 
 		COL_FRIEND_TYPE = 0,
@@ -465,9 +493,10 @@ private:
 		int m_WidthValue;
 		int m_HeightValue;
 	};
-	
+
 	CVideoFormat m_aVideoFormats[MAX_RESOLUTIONS];
-	sorted_array<CVideoMode> m_lFilteredVideoModes;
+	sorted_array<CVideoMode> m_lRecommendedVideoModes;
+	sorted_array<CVideoMode> m_lOtherVideoModes;
 	int m_NumVideoFormats;
 	int m_CurrentVideoFormat;
 	void UpdateVideoFormats();
@@ -500,16 +529,19 @@ private:
 	void RenderServerControlServer(CUIRect MainView);
 
 	// found in menus_browser.cpp
-	int m_ScrollOffset;
+	// int m_ScrollOffset;
 	void RenderServerbrowserServerList(CUIRect View);
+	void RenderServerbrowserSidebar(CUIRect View);
+	void RenderServerbrowserFriendTab(CUIRect View);
+	void RenderServerbrowserFilterTab(CUIRect View);
+	void RenderServerbrowserInfoTab(CUIRect View);
 	void RenderServerbrowserFriendList(CUIRect View);
 	void RenderServerbrowserServerDetail(CUIRect View, const CServerInfo *pInfo);
-	void RenderServerbrowserFilters(CUIRect View);
 	//void RenderServerbrowserFriends(CUIRect View);
 	void RenderServerbrowserBottomBox(CUIRect View);
 	void RenderServerbrowserOverlay();
 	bool RenderFilterHeader(CUIRect View, int FilterIndex);
-	int DoBrowserEntry(const void *pID, CUIRect *pRect, const CServerInfo *pEntry, bool Selected);
+	int DoBrowserEntry(const void *pID, CUIRect *pRect, const CServerInfo *pEntry, const CBrowserFilter *pFilter, bool Selected);
 	void RenderServerbrowser(CUIRect MainView);
 	static void ConchainFriendlistUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainServerbrowserUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
@@ -534,6 +566,9 @@ private:
 	void RenderSettingsSound(CUIRect MainView);
 	void RenderSettings(CUIRect MainView);
 
+	bool DoResolutionList(CUIRect* pRect, CListBoxState* pListBoxState,
+						  const sorted_array<CVideoMode>& lModes);
+
 	// found in menu_callback.cpp
 	static float RenderSettingsControlsMovement(CUIRect View, void *pUser);
 	static float RenderSettingsControlsWeapon(CUIRect View, void *pUser);
@@ -554,6 +589,13 @@ private:
 
 	void SetMenuPage(int NewPage);
 public:
+	struct CSwitchTeamInfo
+	{
+		char m_aNotification[128];
+		bool m_AllowSpec;
+		int m_TimeLeft;
+	};
+	void GetSwitchTeamInfo(CSwitchTeamInfo *pInfo);
 	void RenderBackground();
 
 	void UseMouseButtons(bool Use) { m_UseMouseButtons = Use; }
@@ -569,6 +611,7 @@ public:
 	virtual void OnInit();
 
 	virtual void OnConsoleInit();
+	virtual void OnShutdown();
 	virtual void OnStateChange(int NewState, int OldState);
 	virtual void OnReset();
 	virtual void OnRender();

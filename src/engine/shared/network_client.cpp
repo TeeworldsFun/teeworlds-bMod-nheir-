@@ -117,7 +117,7 @@ int CNetClient::Recv(CNetChunk *pChunk, TOKEN *pResponseToken)
 	return 0;
 }
 
-int CNetClient::Send(CNetChunk *pChunk, TOKEN Token)
+int CNetClient::Send(CNetChunk *pChunk, TOKEN Token, CSendCBData *pCallbackData)
 {
 	if(pChunk->m_Flags&NETSENDFLAG_CONNLESS)
 	{
@@ -142,7 +142,7 @@ int CNetClient::Send(CNetChunk *pChunk, TOKEN Token)
 		{
 			if(pChunk->m_ClientID == -1)
 			{
-				m_TokenCache.SendPacketConnless(&pChunk->m_Address, pChunk->m_pData, pChunk->m_DataSize);
+				m_TokenCache.SendPacketConnless(&pChunk->m_Address, pChunk->m_pData, pChunk->m_DataSize, pCallbackData);
 			}
 			else
 			{
@@ -171,6 +171,11 @@ int CNetClient::Send(CNetChunk *pChunk, TOKEN Token)
 			m_Connection.Flush();
 	}
 	return 0;
+}
+
+void CNetClient::PurgeStoredPacket(int TrackID)
+{
+	m_TokenCache.PurgeStoredPacket(TrackID);
 }
 
 int CNetClient::State() const

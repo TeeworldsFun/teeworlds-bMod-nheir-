@@ -2,6 +2,7 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <new>
 
+#include <immintrin.h> //_mm_pause
 #include <stdlib.h> // qsort
 #include <stdarg.h>
 
@@ -254,6 +255,8 @@ CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotD
 	m_RenderFrameTimeHigh = 0.0f;
 	m_RenderFrames = 0;
 	m_LastRenderTime = time_get();
+	m_LastCpuTime = time_get();
+	m_LastAvgCpuFrameTime = 0;
 
 	m_GameTickSpeed = SERVER_TICK_SPEED;
 
@@ -1091,7 +1094,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 			const unsigned char *pData = Unpacker.GetRaw(Size);
 			if(Unpacker.Error())
 				return;
- 
+
 			io_write(m_MapdownloadFile, pData, Size);
 			++m_MapdownloadChunk;
 			m_MapdownloadAmount += Size;
@@ -1668,20 +1671,25 @@ void CClient::VersionUpdate()
 	{
 		if(m_VersionInfo.m_VersionServeraddr.m_Job.Status() == CJob::STATE_DONE)
 		{
-			CNetChunk Packet;
+			if(m_VersionInfo.m_VersionServeraddr.m_Job.Result() == 0)
+			{
+				CNetChunk Packet;
 
-			mem_zero(&Packet, sizeof(Packet));
+				mem_zero(&Packet, sizeof(Packet));
 
-			m_VersionInfo.m_VersionServeraddr.m_Addr.port = VERSIONSRV_PORT;
+				m_VersionInfo.m_VersionServeraddr.m_Addr.port = VERSIONSRV_PORT;
 
-			Packet.m_ClientID = -1;
-			Packet.m_Address = m_VersionInfo.m_VersionServeraddr.m_Addr;
-			Packet.m_pData = VERSIONSRV_GETVERSION;
-			Packet.m_DataSize = sizeof(VERSIONSRV_GETVERSION);
-			Packet.m_Flags = NETSENDFLAG_CONNLESS;
+				Packet.m_ClientID = -1;
+				Packet.m_Address = m_VersionInfo.m_VersionServeraddr.m_Addr;
+				Packet.m_pData = VERSIONSRV_GETVERSION;
+				Packet.m_DataSize = sizeof(VERSIONSRV_GETVERSION);
+				Packet.m_Flags = NETSENDFLAG_CONNLESS;
 
-			m_ContactClient.Send(&Packet);
-			m_VersionInfo.m_State = CVersionInfo::STATE_READY;
+				m_ContactClient.Send(&Packet);
+				m_VersionInfo.m_State = CVersionInfo::STATE_READY;
+			}
+			else
+				m_VersionInfo.m_State = CVersionInfo::STATE_ERROR;
 		}
 	}
 }
@@ -1710,6 +1718,86 @@ void CClient::InitInterfaces()
 	//
 	m_ServerBrowser.Init(&m_ContactClient, m_pGameClient->NetVersion());
 	m_Friends.Init();
+}
+
+bool CClient::LimitFps()
+{
+	if(g_Config.m_GfxVsync || !g_Config.m_GfxLimitFps) return false;
+
+	/**
+		If desired frame time is not reached:
+			Skip rendering the frame
+			Do another game loop
+
+		If we don't have the time to do another game loop:
+			Wait until desired frametime
+
+		Returns true if frame should be skipped
+	**/
+
+#ifdef CONF_DEBUG
+	static double DbgTimeWaited = 0.0;
+	static int64 DbgFramesSkippedCount = 0;
+	static int64 DbgLastSkippedDbgMsg = time_get();
+#endif
+
+	int64 Now = time_get();
+	const double LastCpuFrameTime = (Now - m_LastCpuTime) / (double)time_freq();
+	m_LastAvgCpuFrameTime = (m_LastAvgCpuFrameTime + LastCpuFrameTime * 4.0) / 5.0;
+	m_LastCpuTime = Now;
+
+	bool SkipFrame = true;
+	double RenderDeltaTime = (Now - m_LastRenderTime) / (double)time_freq();
+	const double DesiredTime = 1.0/g_Config.m_GfxMaxFps;
+
+	// we can't skip another frame, so wait instead
+	if(SkipFrame && RenderDeltaTime < DesiredTime &&
+	   m_LastAvgCpuFrameTime * 1.20 > (DesiredTime - RenderDeltaTime))
+	{
+#ifdef CONF_DEBUG
+		DbgTimeWaited += DesiredTime - RenderDeltaTime;
+#endif
+		const double Freq = (double)time_freq();
+		const int64 LastT = m_LastRenderTime;
+		double d = DesiredTime - RenderDeltaTime;
+		while(d > 0.00001)
+		{
+			Now = time_get();
+			RenderDeltaTime = (Now - LastT) / Freq;
+			d = DesiredTime - RenderDeltaTime;
+			_mm_pause();
+		}
+
+		SkipFrame = false;
+		m_LastCpuTime = Now;
+	}
+
+	// RenderDeltaTime exceeds DesiredTime, render
+	if(SkipFrame && RenderDeltaTime > DesiredTime)
+	{
+		SkipFrame = false;
+	}
+
+#ifdef CONF_DEBUG
+	DbgFramesSkippedCount += SkipFrame? 1:0;
+
+	Now = time_get();
+	if(g_Config.m_GfxLimitFps &&
+	   g_Config.m_Debug &&
+	   (Now - DbgLastSkippedDbgMsg) / (double)time_freq() > 5.0)
+	{
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "LimitFps: FramesSkippedCount=%d TimeWaited=%.3f (per sec)",
+				   DbgFramesSkippedCount/5,
+				   DbgTimeWaited/5.0);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", aBuf);
+		DbgFramesSkippedCount = 0;
+		DbgTimeWaited = 0;
+		DbgLastSkippedDbgMsg = Now;
+	}
+#endif
+
+	return SkipFrame;
 }
 
 void CClient::Run()
@@ -1901,14 +1989,17 @@ void CClient::Run()
 				m_EditorActive = false;
 
 			Update();
-			
-			if(!g_Config.m_GfxAsyncRender || m_pGraphics->IsIdle())
+
+			const bool SkipFrame = LimitFps();
+
+			if(!SkipFrame && (!g_Config.m_GfxAsyncRender || m_pGraphics->IsIdle()))
 			{
 				m_RenderFrames++;
 
 				// update frametime
 				int64 Now = time_get();
 				m_RenderFrameTime = (Now - m_LastRenderTime) / (float)time_freq();
+
 				if(m_RenderFrameTime < m_RenderFrameTimeLow)
 					m_RenderFrameTimeLow = m_RenderFrameTime;
 				if(m_RenderFrameTime > m_RenderFrameTimeHigh)
@@ -2073,7 +2164,7 @@ void CClient::Con_RconAuth(IConsole::IResult *pResult, void *pUserData)
 const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 {
 	int Crc;
-	
+
 	Disconnect();
 	m_NetClient.ResetErrorString();
 
@@ -2345,14 +2436,27 @@ void CClient::HandleTeeworldsConnectLink(const char *pConLink)
 int main(int argc, const char **argv) // ignore_convention
 {
 #if defined(CONF_FAMILY_WINDOWS)
+	#ifdef CONF_RELEASE
+	bool HideConsole = true;
+	#else
+	bool HideConsole = false;
+	#endif
 	for(int i = 1; i < argc; i++) // ignore_convention
 	{
+		if(str_comp("-c", argv[i]) == 0 || str_comp("--console", argv[i]) == 0) // ignore_convention
+		{
+			HideConsole = false;
+			break;
+		}
 		if(str_comp("-s", argv[i]) == 0 || str_comp("--silent", argv[i]) == 0) // ignore_convention
 		{
-			FreeConsole();
+			HideConsole = true;
 			break;
 		}
 	}
+
+	if(HideConsole)
+		FreeConsole();
 #endif
 
 	bool UseDefaultConfig = false;

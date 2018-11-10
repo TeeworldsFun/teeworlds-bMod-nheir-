@@ -33,8 +33,8 @@ public:
 	int NumServers() const { return m_aServerlist[m_ActServerlistType].m_NumServers; }
 	int NumPlayers() const { return m_aServerlist[m_ActServerlistType].m_NumPlayers; }
 
-	int NumSortedServers(int Index) const { return m_ServerBrowserFilter.GetNumSortedServers(Index); }
-	int NumSortedPlayers(int Index) const { return m_ServerBrowserFilter.GetNumSortedPlayers(Index); }
+	int NumSortedServers(int FilterIndex) const { return m_ServerBrowserFilter.GetNumSortedServers(FilterIndex); }
+	int NumSortedPlayers(int FilterIndex) const { return m_ServerBrowserFilter.GetNumSortedPlayers(FilterIndex); }
 	const CServerInfo *SortedGet(int FilterIndex, int Index) const { return &m_aServerlist[m_ActServerlistType].m_ppServerlist[m_ServerBrowserFilter.GetIndex(FilterIndex, Index)]->m_Info; };
 	const void *GetID(int FilterIndex, int Index) const { return m_ServerBrowserFilter.GetID(FilterIndex, Index); };
 
@@ -46,6 +46,8 @@ public:
 	void SetFilter(int Index, const CServerFilterInfo *pFilterInfo) { m_ServerBrowserFilter.SetFilter(Index, pFilterInfo); }; 
 	void GetFilter(int Index, CServerFilterInfo *pFilterInfo) { m_ServerBrowserFilter.GetFilter(Index, pFilterInfo); };
 	void RemoveFilter(int Index) { m_ServerBrowserFilter.RemoveFilter(Index); };
+
+	static void CBFTrackPacket(int TrackID, void *pUser);
 
 private:
 	class CNetClient *m_pNetClient;
@@ -88,7 +90,7 @@ private:
 	CServerEntry *Find(int ServerlistType, const NETADDR &Addr);
 	void QueueRequest(CServerEntry *pEntry);
 	void RemoveRequest(CServerEntry *pEntry);
-	void RequestImpl(const NETADDR &Addr, CServerEntry *pEntry) const;
+	void RequestImpl(const NETADDR &Addr, CServerEntry *pEntry);
 	void SetInfo(int ServerlistType, CServerEntry *pEntry, const CServerInfo &Info);
 };
 
