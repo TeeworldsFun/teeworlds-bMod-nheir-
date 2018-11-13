@@ -33,7 +33,7 @@
 #include "skins.h"
 
 float CMenus::ms_ButtonHeight = 25.0f;
-float CMenus::ms_ListheaderHeight = 20.0f;
+float CMenus::ms_ListheaderHeight = 17.0f;
 float CMenus::ms_FontmodHeight = 0.8f;
 
 
@@ -59,12 +59,13 @@ CMenus::CMenus()
 
 	SetMenuPage(PAGE_START);
 
-	m_InfoMode = false;
 	m_PopupActive = false;
 
 	m_EscapePressed = false;
 	m_EnterPressed = false;
 	m_DeletePressed = false;
+	m_UpArrowPressed = false;
+	m_DownArrowPressed = false;
 
 	m_LastInput = time_get();
 
@@ -959,8 +960,8 @@ CMenus::CListboxItem CMenus::UiDoListboxNextItem(CListBoxState* pState, const vo
 			else
 			{
 				int NewIndex = -1;
-				if(Input()->KeyPress(KEY_DOWN)) NewIndex = pState->m_ListBoxNewSelected + 1;
-				if(Input()->KeyPress(KEY_UP)) NewIndex = pState->m_ListBoxNewSelected - 1;
+				if(m_DownArrowPressed) NewIndex = pState->m_ListBoxNewSelected + 1;
+				if(m_UpArrowPressed) NewIndex = pState->m_ListBoxNewSelected - 1;
 				if(NewIndex > -1 && NewIndex < pState->m_ListBoxNumItems)
 				{
 					// scroll
@@ -1104,6 +1105,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_GeneralButton;
 		if(DoButton_MenuTabTop(&s_GeneralButton, Localize("General"), g_Config.m_UiSettingsPage==SETTINGS_GENERAL, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_GENERAL);
 			g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
 		}
 
@@ -1112,6 +1114,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_PlayerButton;
 		if(Client()->State() != IClient::STATE_ONLINE && DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), g_Config.m_UiSettingsPage == SETTINGS_PLAYER, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_PLAYER);
 			g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
 		}
 
@@ -1120,6 +1123,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_TeeButton;
 		if(Client()->State() != IClient::STATE_ONLINE && DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), g_Config.m_UiSettingsPage == SETTINGS_TEE, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_TEE);
 			g_Config.m_UiSettingsPage = SETTINGS_TEE;
 		}
 
@@ -1128,6 +1132,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_ControlsButton;
 		if(DoButton_MenuTabTop(&s_ControlsButton, Localize("Controls"), g_Config.m_UiSettingsPage==SETTINGS_CONTROLS, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_CONTROLS);
 			g_Config.m_UiSettingsPage = SETTINGS_CONTROLS;
 		}
 
@@ -1136,6 +1141,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_GraphicsButton;
 		if(DoButton_MenuTabTop(&s_GraphicsButton, Localize("Graphics"), g_Config.m_UiSettingsPage==SETTINGS_GRAPHICS, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_GRAPHICS);
 			g_Config.m_UiSettingsPage = SETTINGS_GRAPHICS;
 		}
 
@@ -1144,6 +1150,7 @@ void CMenus::RenderMenubar(CUIRect r)
 		static CButtonContainer s_SoundButton;
 		if(DoButton_MenuTabTop(&s_SoundButton, Localize("Sound"), g_Config.m_UiSettingsPage==SETTINGS_SOUND, &Button))
 		{
+			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_SOUND);
 			g_Config.m_UiSettingsPage = SETTINGS_SOUND;
 		}
 	}
@@ -2303,6 +2310,10 @@ bool CMenus::OnInput(IInput::CEvent e)
 				m_EnterPressed = true;
 			else if(e.m_Key == KEY_DELETE)
 				m_DeletePressed = true;
+			else if(e.m_Key == KEY_UP)
+				m_UpArrowPressed = true;
+			else if(e.m_Key == KEY_DOWN)
+				m_DownArrowPressed = true;
 		}
 		return true;
 	}
@@ -2419,6 +2430,8 @@ void CMenus::OnRender()
 		m_EscapePressed = false;
 		m_EnterPressed = false;
 		m_DeletePressed = false;
+		m_UpArrowPressed = false;
+		m_DownArrowPressed = false;
 		return;
 	}
 
@@ -2443,11 +2456,13 @@ void CMenus::OnRender()
 
 	// render cursor
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_CURSOR].m_Id);
+	Graphics()->WrapClamp();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1,1,1,1);
 	IGraphics::CQuadItem QuadItem(mx, my, 24, 24);
 	Graphics()->QuadsDrawTL(&QuadItem, 1);
 	Graphics()->QuadsEnd();
+	Graphics()->WrapNormal();
 
 	// render debug information
 	if(g_Config.m_Debug)
@@ -2466,6 +2481,8 @@ void CMenus::OnRender()
 	m_EscapePressed = false;
 	m_EnterPressed = false;
 	m_DeletePressed = false;
+	m_UpArrowPressed = false;
+	m_DownArrowPressed = false;
 }
 
 void CMenus::RenderBackground()
@@ -2556,9 +2573,9 @@ void CMenus::SetMenuPage(int NewPage) {
 		{
 		case PAGE_START: CameraPos = CCamera::POS_START; break;
 		case PAGE_DEMOS: CameraPos = CCamera::POS_DEMOS; break;
-		case PAGE_SETTINGS: CameraPos = CCamera::POS_SETTINGS; break;
-		case PAGE_INTERNET:
-		case PAGE_LAN: CameraPos = CCamera::POS_INTERNET;
+		case PAGE_SETTINGS: CameraPos = g_Config.m_UiSettingsPage; break;
+		case PAGE_INTERNET: CameraPos = CCamera::POS_INTERNET; break;
+		case PAGE_LAN: CameraPos = CCamera::POS_LAN;
 		}
 
 		if(CameraPos != -1 && m_pClient && m_pClient->m_pCamera)
