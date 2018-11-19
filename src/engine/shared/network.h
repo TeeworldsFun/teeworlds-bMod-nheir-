@@ -84,7 +84,7 @@ enum
 	// token
 	NET_SEEDTIME = 10,
 
-	NET_TOKENCACHE_SIZE = 16,
+	NET_TOKENCACHE_SIZE = 64,
 	NET_TOKENCACHE_ADDRESSEXPIRY = NET_SEEDTIME/2,
 	NET_TOKENCACHE_PACKETEXPIRY = NET_TOKENCACHE_ADDRESSEXPIRY,
 
@@ -235,6 +235,7 @@ private:
 		int m_DataSize;
 		char m_aData[NET_MAX_PAYLOAD];
 		int64 m_Expiry;
+		int64 m_LastTokenRequest;
 		const int m_TrackID;
 		FSendCallback m_pfnCallback;
 		void *m_pCallbackUser;

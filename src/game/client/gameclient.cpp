@@ -627,7 +627,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 				return;
 			}
 
-			if(m_LocalClientID != -1)
+			if(m_LocalClientID != -1 && !pMsg->m_Silent)
 			{
 				DoEnterMessage(pMsg->m_pName, pMsg->m_ClientID, pMsg->m_Team);
 				
@@ -676,13 +676,16 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 			return;
 		}
 
-		DoLeaveMessage(m_aClients[pMsg->m_ClientID].m_aName, pMsg->m_ClientID, pMsg->m_pReason);
+		if(!pMsg->m_Silent)
+		{
+			DoLeaveMessage(m_aClients[pMsg->m_ClientID].m_aName, pMsg->m_ClientID, pMsg->m_pReason);
 
-		CNetMsg_De_ClientLeave Msg;
-		Msg.m_pName = m_aClients[pMsg->m_ClientID].m_aName;
-		Msg.m_ClientID = pMsg->m_ClientID;
-		Msg.m_pReason = pMsg->m_pReason;
-		Client()->SendPackMsg(&Msg, MSGFLAG_NOSEND|MSGFLAG_RECORD);
+			CNetMsg_De_ClientLeave Msg;
+			Msg.m_pName = m_aClients[pMsg->m_ClientID].m_aName;
+			Msg.m_ClientID = pMsg->m_ClientID;
+			Msg.m_pReason = pMsg->m_pReason;
+			Client()->SendPackMsg(&Msg, MSGFLAG_NOSEND | MSGFLAG_RECORD);
+		}
 
 		m_GameInfo.m_NumPlayers--;
 		// calculate team-balance
@@ -1144,7 +1147,7 @@ void CGameClient::OnNewSnapshot()
 	CServerInfo CurrentServerInfo;
 	Client()->GetServerInfo(&CurrentServerInfo);
 	if(str_comp(CurrentServerInfo.m_aGameType, "DM") != 0 && str_comp(CurrentServerInfo.m_aGameType, "TDM") != 0 && str_comp(CurrentServerInfo.m_aGameType, "CTF") != 0 &&
-		str_comp(CurrentServerInfo.m_aGameType, "LMS") != 0 && str_comp(CurrentServerInfo.m_aGameType, "SUR") != 0)
+		str_comp(CurrentServerInfo.m_aGameType, "LMS") != 0 && str_comp(CurrentServerInfo.m_aGameType, "LTS") != 0)
 		m_ServerMode = SERVERMODE_MOD;
 	else if(mem_comp(&StandardTuning, &m_Tuning, sizeof(CTuningParams)) == 0)
 		m_ServerMode = SERVERMODE_PURE;

@@ -15,8 +15,8 @@
 #include "gamemodes/ctf.h"
 #include "gamemodes/dm.h"
 #include "gamemodes/lms.h"
+#include "gamemodes/lts.h"
 #include "gamemodes/mod.h"
-#include "gamemodes/sur.h"
 #include "gamemodes/tdm.h"
 #include "gamecontext.h"
 #include "player.h"
@@ -410,7 +410,7 @@ void CGameContext::CheckPureTuning()
 		str_comp(m_pController->GetGameType(), "TDM")==0 ||
 		str_comp(m_pController->GetGameType(), "CTF")==0 ||
 		str_comp(m_pController->GetGameType(), "LMS")==0 ||
-		str_comp(m_pController->GetGameType(), "SUR")==0)
+		str_comp(m_pController->GetGameType(), "LTS")==0)
 	{
 		CTuningParams p;
 		if(mem_comp(&p, &m_Tuning, sizeof(p)) != 0)
@@ -618,6 +618,7 @@ void CGameContext::OnClientEnter(int ClientID)
 	NewClientInfoMsg.m_pName = Server()->ClientName(ClientID);
 	NewClientInfoMsg.m_pClan = Server()->ClientClan(ClientID);
 	NewClientInfoMsg.m_Country = Server()->ClientCountry(ClientID);
+	NewClientInfoMsg.m_Silent = false;
 	for(int p = 0; p < 6; p++)
 	{
 		NewClientInfoMsg.m_apSkinPartNames[p] = m_apPlayers[ClientID]->m_TeeInfos.m_aaSkinPartNames[p];
@@ -643,6 +644,7 @@ void CGameContext::OnClientEnter(int ClientID)
 		ClientInfoMsg.m_pName = Server()->ClientName(i);
 		ClientInfoMsg.m_pClan = Server()->ClientClan(i);
 		ClientInfoMsg.m_Country = Server()->ClientCountry(i);
+		ClientInfoMsg.m_Silent = false;
 		for(int p = 0; p < 6; p++)
 		{
 			ClientInfoMsg.m_apSkinPartNames[p] = m_apPlayers[i]->m_TeeInfos.m_aaSkinPartNames[p];
@@ -710,6 +712,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 		CNetMsg_Sv_ClientDrop Msg;
 		Msg.m_ClientID = ClientID;
 		Msg.m_pReason = pReason;
+		Msg.m_Silent = false;
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_NORECORD, -1);
 	}
 
@@ -1451,8 +1454,8 @@ void CGameContext::OnInit()
 		m_pController = new CGameControllerCTF(this);
 	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0)
 		m_pController = new CGameControllerLMS(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "sur") == 0)
-		m_pController = new CGameControllerSUR(this);
+	else if(str_comp_nocase(g_Config.m_SvGametype, "lts") == 0)
+		m_pController = new CGameControllerLTS(this);
 	else if(str_comp_nocase(g_Config.m_SvGametype, "tdm") == 0)
 		m_pController = new CGameControllerTDM(this);
 	else
