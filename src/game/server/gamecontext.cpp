@@ -218,6 +218,7 @@ void CGameContext::SendChat(int ChatterClientID, int Mode, int To, const char *p
 	Msg.m_Mode = Mode;
 	Msg.m_ClientID = ChatterClientID;
 	Msg.m_pMessage = pText;
+	Msg.m_TargetID = -1;
 
 	if(Mode == CHAT_ALL)
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
@@ -238,9 +239,17 @@ void CGameContext::SendChat(int ChatterClientID, int Mode, int To, const char *p
 	else // Mode == CHAT_WHISPER
 	{
 		// send to the clients
+		Msg.m_TargetID = To;
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ChatterClientID);
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, To);
 	}
+}
+
+void CGameContext::SendBroadcast(const char* pText, int ClientID)
+{
+	CNetMsg_Sv_Broadcast Msg;
+	Msg.m_pMessage = pText;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientID);
 }
 
 void CGameContext::SendEmoticon(int ClientID, int Emoticon)
@@ -754,7 +763,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			const char *p = pMsg->m_pMessage;
 			const char *pEnd = 0;
 			while(*p)
- 			{
+			{
 				const char *pStrOld = p;
 				int Code = str_utf8_decode(&p);
 
@@ -773,7 +782,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 					*(const_cast<char *>(p)) = 0;
 					break;
 				}
- 			}
+			}
 			if(pEnd != 0)
 				*(const_cast<char *>(pEnd)) = 0;
 
@@ -959,7 +968,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		{
 			CNetMsg_Cl_SetSpectatorMode *pMsg = (CNetMsg_Cl_SetSpectatorMode *)pRawMsg;
 
-			if(g_Config.m_SvSpamprotection && pPlayer->m_LastSetSpectatorMode && pPlayer->m_LastSetSpectatorMode+Server()->TickSpeed()*3 > Server()->Tick())
+			if(g_Config.m_SvSpamprotection && pPlayer->m_LastSetSpectatorMode && pPlayer->m_LastSetSpectatorMode+Server()->TickSpeed() > Server()->Tick())
 				return;
 
 			pPlayer->m_LastSetSpectatorMode = Server()->Tick();
@@ -1119,6 +1128,12 @@ void CGameContext::ConSay(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	pSelf->SendChat(-1, CHAT_ALL, -1, pResult->GetString(0));
+}
+
+void CGameContext::ConBroadcast(IConsole::IResult* pResult, void* pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	pSelf->SendBroadcast(pResult->GetString(0), -1);
 }
 
 void CGameContext::ConSetTeam(IConsole::IResult *pResult, void *pUserData)
@@ -1408,6 +1423,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("change_map", "?r", CFGFLAG_SERVER|CFGFLAG_STORE, ConChangeMap, this, "Change map");
 	Console()->Register("restart", "?i", CFGFLAG_SERVER|CFGFLAG_STORE, ConRestart, this, "Restart in x seconds (0 = abort)");
 	Console()->Register("say", "r", CFGFLAG_SERVER, ConSay, this, "Say in chat");
+	Console()->Register("broadcast", "r", CFGFLAG_SERVER, ConBroadcast, this, "Broadcast message");
 	Console()->Register("set_team", "ii?i", CFGFLAG_SERVER, ConSetTeam, this, "Set team of player to team");
 	Console()->Register("set_team_all", "i", CFGFLAG_SERVER, ConSetTeamAll, this, "Set team of all players to team");
 	Console()->Register("swap_teams", "", CFGFLAG_SERVER, ConSwapTeams, this, "Swap the current teams");
@@ -1485,7 +1501,7 @@ void CGameContext::OnInit()
 	if(g_Config.m_DbgDummies)
 	{
 		for(int i = 0; i < g_Config.m_DbgDummies ; i++)
-			OnClientConnected(MAX_CLIENTS-i-1, true);
+			OnClientConnected(Server()->MaxClients() -i-1, true);
 	}
 #endif
 

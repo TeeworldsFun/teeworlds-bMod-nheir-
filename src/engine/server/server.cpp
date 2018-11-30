@@ -1142,7 +1142,7 @@ void CServer::GenerateServerInfo(CPacker *pPacker, int Token)
 				pPacker->AddString(ClientClan(i), MAX_CLAN_LENGTH); // client clan
 				pPacker->AddInt(m_aClients[i].m_Country); // client country
 				pPacker->AddInt(m_aClients[i].m_Score); // client score
-				pPacker->AddInt(GameServer()->IsClientPlayer(i)?1:0); // is player?
+				pPacker->AddInt(GameServer()->IsClientPlayer(i)?0:1); // flag spectator=1, bot=2 (player=0)
 			}
 		}
 	}
@@ -1331,12 +1331,6 @@ int CServer::Run()
 
 		m_Lastheartbeat = 0;
 		m_GameStartTime = time_get();
-
-		if(g_Config.m_Debug)
-		{
-			str_format(aBuf, sizeof(aBuf), "baseline memory usage %dk", mem_stats()->allocated/1024);
-			Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "server", aBuf);
-		}
 
 		while(m_RunServer)
 		{

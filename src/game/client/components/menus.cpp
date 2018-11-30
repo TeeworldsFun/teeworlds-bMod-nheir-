@@ -35,6 +35,7 @@
 float CMenus::ms_ButtonHeight = 25.0f;
 float CMenus::ms_ListheaderHeight = 17.0f;
 float CMenus::ms_FontmodHeight = 0.8f;
+float CMenus::ms_BackgroundAlpha = 0.25f;
 
 
 CMenus::CMenus()
@@ -78,6 +79,7 @@ CMenus::CMenus()
 
 	m_SelectedServer.m_Filter = -1;
 	m_SelectedServer.m_Index = -1;
+	m_ActiveListBox = ACTLB_THEME;
 }
 
 float CMenus::ButtonFade(CButtonContainer *pBC, float Seconds, int Checked)
@@ -215,22 +217,36 @@ int CMenus::DoButton_MenuTab(const void *pID, const char *pText, int Checked, co
 	return UI()->DoButtonLogic(pID, pText, Checked, pRect);
 }
 
-int CMenus::DoButton_MenuTabTop(CButtonContainer *pBC, const char *pText, int Checked, const CUIRect *pRect, int Corners, float r, float FontFactor)
+int CMenus::DoButton_MenuTabTop(CButtonContainer *pBC, const char *pText, int Checked, const CUIRect *pRect, float Alpha, float FontAlpha, int Corners, float r, float FontFactor)
 {
+	if(UI()->MouseInside(pRect))
+		Alpha = 1.0f;
 	float Seconds = 0.6f; //  0.6 seconds for fade
 	float Fade = ButtonFade(pBC, Seconds, Checked);
-	float FadeVal = Fade/Seconds;
+	float FadeVal = (Fade/Seconds)*FontAlpha;
 
-	RenderTools()->DrawUIRect(pRect, vec4(0.0f+FadeVal, 0.0f+FadeVal, 0.0f+FadeVal, 0.25f+FadeVal*0.5f), Corners, r);
+	RenderTools()->DrawUIRect(pRect, vec4(0.0f+FadeVal, 0.0f+FadeVal, 0.0f+FadeVal, 0.25f*Alpha+FadeVal*0.5f), Corners, r);
 	CUIRect Temp;
 	pRect->HMargin(pRect->h>=20.0f?2.0f:1.0f, &Temp);
 	Temp.HMargin((Temp.h*FontFactor)/2.0f, &Temp);
-	TextRender()->TextColor(1.0f-FadeVal, 1.0f-FadeVal, 1.0f-FadeVal, 1.0f);
-	TextRender()->TextOutlineColor(0.0f+FadeVal, 0.0f+FadeVal, 0.0f+FadeVal, 0.25f);
+	TextRender()->TextColor(1.0f-FadeVal, 1.0f-FadeVal, 1.0f-FadeVal, FontAlpha);
+	TextRender()->TextOutlineColor(0.0f+FadeVal, 0.0f+FadeVal, 0.0f+FadeVal, 0.25f*FontAlpha);
 	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, CUI::ALIGN_CENTER);
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.3f);
 	return UI()->DoButtonLogic(pBC->GetID(), pText, Checked, pRect);
+}
+
+void CMenus::DoButton_MenuTabTop_Dummy(const char *pText, int Checked, const CUIRect *pRect, float Alpha)
+{
+	RenderTools()->DrawUIRect(pRect, vec4(0.0f, 0.0f, 0.0f, 0.25f*Alpha), CUI::CORNER_ALL, 5.0f);
+	CUIRect Temp;
+	pRect->HMargin(pRect->h >= 20.0f ? 2.0f : 1.0f, &Temp);
+	TextRender()->TextColor(0.15f, 0.15f, 0.15f, Alpha);
+	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.25f*Alpha);
+	UI()->DoLabel(&Temp, pText, Temp.h*ms_FontmodHeight, CUI::ALIGN_CENTER);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+	TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.3f);
 }
 
 int CMenus::DoButton_GridHeader(const void *pID, const char *pText, int Checked, const CUIRect *pRect)
@@ -1073,16 +1089,67 @@ int CMenus::DoKeyReader(CButtonContainer *pBC, const CUIRect *pRect, int Key)
 	return NewKey;
 }
 
-void CMenus::RenderMenubar(CUIRect r)
+void CMenus::RenderMenubar(CUIRect Rect)
 {
-	CUIRect Box = r;
+	CUIRect Box;
 	CUIRect Button;
+	Rect.HSplitTop(60.0f, &Box, &Rect);
+	const float InactiveAlpha = 0.25f;
 
 	m_ActivePage = m_MenuPage;
 	int NewPage = -1;
 
 	if(Client()->State() != IClient::STATE_OFFLINE)
 		m_ActivePage = m_GamePage;
+
+	if(Client()->State() == IClient::STATE_ONLINE)
+	{
+		float Spacing = 3.0f;
+		float ButtonWidth = (Box.w / 6.0f) - (Spacing*5.0) / 6.0f;
+		float Alpha = 1.0f;
+		if(m_GamePage == PAGE_SETTINGS)
+			Alpha = InactiveAlpha;
+
+		// render header backgrounds
+		CUIRect Left, Right;
+		Box.VSplitLeft(ButtonWidth*4.0f + Spacing * 3.0f, &Left, 0);
+		Box.VSplitRight(ButtonWidth, 0, &Right);
+		RenderTools()->DrawUIRect4(&Left, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
+		RenderTools()->DrawUIRect4(&Right, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
+
+		Left.HSplitBottom(25.0f, 0, &Left);
+		Right.HSplitBottom(25.0f, 0, &Right);
+
+		Left.VSplitLeft(ButtonWidth, &Button, &Left);
+		static CButtonContainer s_GameButton;
+		if(DoButton_MenuTabTop(&s_GameButton, Localize("Game"), m_ActivePage == PAGE_GAME, &Button, Alpha, Alpha))
+			NewPage = PAGE_GAME;
+
+		Left.VSplitLeft(Spacing, 0, &Left); // little space
+		Left.VSplitLeft(ButtonWidth, &Button, &Left);
+		static CButtonContainer s_PlayersButton;
+		if(DoButton_MenuTabTop(&s_PlayersButton, Localize("Players"), m_ActivePage == PAGE_PLAYERS, &Button, Alpha, Alpha))
+			NewPage = PAGE_PLAYERS;
+
+		Left.VSplitLeft(Spacing, 0, &Left); // little space
+		Left.VSplitLeft(ButtonWidth, &Button, &Left);
+		static CButtonContainer s_ServerInfoButton;
+		if(DoButton_MenuTabTop(&s_ServerInfoButton, Localize("Server info"), m_ActivePage == PAGE_SERVER_INFO, &Button, Alpha, Alpha))
+			NewPage = PAGE_SERVER_INFO;
+
+		Left.VSplitLeft(Spacing, 0, &Left); // little space
+		Left.VSplitLeft(ButtonWidth, &Button, &Left);
+		static CButtonContainer s_CallVoteButton;
+		if(DoButton_MenuTabTop(&s_CallVoteButton, Localize("Call vote"), m_ActivePage == PAGE_CALLVOTE, &Button, Alpha, Alpha))
+			NewPage = PAGE_CALLVOTE;
+
+		static CButtonContainer s_SettingsButton;
+		if(DoButton_MenuTabTop(&s_SettingsButton, Localize("Settings"), m_GamePage == PAGE_SETTINGS, &Right))
+			NewPage = PAGE_SETTINGS;
+		
+		Rect.HSplitTop(Spacing, 0, &Rect);
+		Rect.HSplitTop(25.0f, &Box, &Rect);
+	}
 
 	if((Client()->State() == IClient::STATE_OFFLINE && m_MenuPage == PAGE_SETTINGS) || (Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_SETTINGS))
 	{
@@ -1092,15 +1159,19 @@ void CMenus::RenderMenubar(CUIRect r)
 		}
 		float Spacing = 3.0f;
 		float ButtonWidth = (Box.w/6.0f)-(Spacing*5.0)/6.0f;
+		float NotActiveAlpha = Client()->State() == IClient::STATE_ONLINE ? 0.5f : 1.0f;
+		int Corners = Client()->State() == IClient::STATE_ONLINE ? CUI::CORNER_T : CUI::CORNER_ALL;
 
 		// render header background
-		RenderTools()->DrawUIRect4(&Box, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
+		if(Client()->State() == IClient::STATE_OFFLINE)
+			RenderTools()->DrawUIRect4(&Box, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
 
 		Box.HSplitBottom(25.0f, 0, &Box);
 
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
 		static CButtonContainer s_GeneralButton;
-		if(DoButton_MenuTabTop(&s_GeneralButton, Localize("General"), g_Config.m_UiSettingsPage==SETTINGS_GENERAL, &Button))
+		if(DoButton_MenuTabTop(&s_GeneralButton, Localize("General"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage==SETTINGS_GENERAL, &Button,
+			g_Config.m_UiSettingsPage == SETTINGS_GENERAL ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 		{
 			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_GENERAL);
 			g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
@@ -1108,26 +1179,33 @@ void CMenus::RenderMenubar(CUIRect r)
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
-		static CButtonContainer s_PlayerButton;
-		if(Client()->State() != IClient::STATE_ONLINE && DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), g_Config.m_UiSettingsPage == SETTINGS_PLAYER, &Button))
+		if(Client()->State() == IClient::STATE_OFFLINE)
 		{
-			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_PLAYER);
-			g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
+			static CButtonContainer s_PlayerButton;
+			if(DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), g_Config.m_UiSettingsPage == SETTINGS_PLAYER, &Button))
+			{
+				m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_PLAYER);
+				g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
+			}
 		}
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
-		static CButtonContainer s_TeeButton;
-		if(Client()->State() != IClient::STATE_ONLINE && DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), g_Config.m_UiSettingsPage == SETTINGS_TEE, &Button))
+		if(Client()->State() == IClient::STATE_OFFLINE)
 		{
-			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_TEE);
-			g_Config.m_UiSettingsPage = SETTINGS_TEE;
+			static CButtonContainer s_TeeButton;
+			if(DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), g_Config.m_UiSettingsPage == SETTINGS_TEE, &Button))
+			{
+				m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_TEE);
+				g_Config.m_UiSettingsPage = SETTINGS_TEE;
+			}
 		}
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
 		static CButtonContainer s_ControlsButton;
-		if(DoButton_MenuTabTop(&s_ControlsButton, Localize("Controls"), g_Config.m_UiSettingsPage==SETTINGS_CONTROLS, &Button))
+		if(DoButton_MenuTabTop(&s_ControlsButton, Localize("Controls"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage==SETTINGS_CONTROLS, &Button,
+			g_Config.m_UiSettingsPage == SETTINGS_CONTROLS ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 		{
 			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_CONTROLS);
 			g_Config.m_UiSettingsPage = SETTINGS_CONTROLS;
@@ -1136,7 +1214,8 @@ void CMenus::RenderMenubar(CUIRect r)
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
 		static CButtonContainer s_GraphicsButton;
-		if(DoButton_MenuTabTop(&s_GraphicsButton, Localize("Graphics"), g_Config.m_UiSettingsPage==SETTINGS_GRAPHICS, &Button))
+		if(DoButton_MenuTabTop(&s_GraphicsButton, Localize("Graphics"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage==SETTINGS_GRAPHICS, &Button,
+			g_Config.m_UiSettingsPage == SETTINGS_GRAPHICS ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 		{
 			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_GRAPHICS);
 			g_Config.m_UiSettingsPage = SETTINGS_GRAPHICS;
@@ -1145,7 +1224,8 @@ void CMenus::RenderMenubar(CUIRect r)
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
 		static CButtonContainer s_SoundButton;
-		if(DoButton_MenuTabTop(&s_SoundButton, Localize("Sound"), g_Config.m_UiSettingsPage==SETTINGS_SOUND, &Button))
+		if(DoButton_MenuTabTop(&s_SoundButton, Localize("Sound"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage==SETTINGS_SOUND, &Button,
+			g_Config.m_UiSettingsPage == SETTINGS_SOUND ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 		{
 			m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_SOUND);
 			g_Config.m_UiSettingsPage = SETTINGS_SOUND;
@@ -1205,52 +1285,8 @@ void CMenus::RenderMenubar(CUIRect r)
 			TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.3f);
 		}
 	}
-	else
-	{
-		float Spacing = 3.0f;
-		float ButtonWidth = (Box.w/6.0f)-(Spacing*5.0)/6.0f;
-
-		// render header backgrounds
-		CUIRect Left, Right;
-		Box.VSplitLeft(ButtonWidth*4.0f+Spacing*3.0f, &Left, 0);
-		Box.VSplitRight(ButtonWidth, 0, &Right);
-		RenderTools()->DrawUIRect4(&Left, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
-		RenderTools()->DrawUIRect4(&Right, vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.0f), vec4(0.0f, 0.0f, 0.0f, 0.25f), vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_B, 5.0f);
-
-		Left.HSplitBottom(25.0f, 0, &Left);
-		Right.HSplitBottom(25.0f, 0, &Right);
-
-		// online menus
-		if(m_GamePage != PAGE_SETTINGS) // Game stuff
-		{
-			Left.VSplitLeft(ButtonWidth, &Button, &Left);
-			static CButtonContainer s_GameButton;
-			if(DoButton_MenuTabTop(&s_GameButton, Localize("Game"), m_ActivePage==PAGE_GAME, &Button))
-				NewPage = PAGE_GAME;
-
-			Left.VSplitLeft(Spacing, 0, &Left); // little space
-			Left.VSplitLeft(ButtonWidth, &Button, &Left);
-			static CButtonContainer s_PlayersButton;
-			if(DoButton_MenuTabTop(&s_PlayersButton, Localize("Players"), m_ActivePage==PAGE_PLAYERS, &Button))
-				NewPage = PAGE_PLAYERS;
-
-			Left.VSplitLeft(Spacing, 0, &Left); // little space
-			Left.VSplitLeft(ButtonWidth, &Button, &Left);
-			static CButtonContainer s_ServerInfoButton;
-			if(DoButton_MenuTabTop(&s_ServerInfoButton, Localize("Server info"), m_ActivePage==PAGE_SERVER_INFO, &Button))
-				NewPage = PAGE_SERVER_INFO;
-
-			Left.VSplitLeft(Spacing, 0, &Left); // little space
-			Left.VSplitLeft(ButtonWidth, &Button, &Left);
-			static CButtonContainer s_CallVoteButton;
-			if(DoButton_MenuTabTop(&s_CallVoteButton, Localize("Call vote"), m_ActivePage==PAGE_CALLVOTE, &Button))
-				NewPage = PAGE_CALLVOTE;
-
-			static CButtonContainer s_SettingsButton;
-			if(DoButton_MenuTabTop(&s_SettingsButton, Localize("Settings"), 0, &Right))
-				NewPage = PAGE_SETTINGS;
-		}
-	}
+	
+	
 
 	if(NewPage != -1)
 	{
@@ -1313,6 +1349,9 @@ void CMenus::RenderNews(CUIRect MainView)
 
 void CMenus::RenderBackButton(CUIRect MainView)
 {
+	if(Client()->State() != IClient::STATE_OFFLINE)
+		return;
+
 	// same size like tabs in top but variables not really needed
 	float Spacing = 3.0f;
 	float ButtonWidth = (MainView.w/6.0f)-(Spacing*5.0)/6.0f;
@@ -1327,12 +1366,9 @@ void CMenus::RenderBackButton(CUIRect MainView)
 	MainView.HSplitTop(25.0f, &MainView, 0);
 	Button = MainView;
 	static CButtonContainer s_MenuButton;
-	if(DoButton_Menu(&s_MenuButton, Localize("Back"), 0, &Button) || (m_EscapePressed && Client()->State() != IClient::STATE_ONLINE))
+	if(DoButton_Menu(&s_MenuButton, Localize("Back"), 0, &Button) || m_EscapePressed)
 	{
-		if(Client()->State() != IClient::STATE_OFFLINE)
-			m_GamePage = PAGE_GAME;
-		else
-			SetMenuPage(PAGE_START);
+		SetMenuPage(PAGE_START);
 	}
 }
 
@@ -1610,8 +1646,11 @@ int CMenus::Render()
 		else
 		{
 			// do tab bar
+			float BarHeight = 60.0f;
+			if(Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_SETTINGS)
+				BarHeight += 3.0f + 25.0f;
 			Screen.VMargin(Screen.w/2-365.0f, &MainView);
-			MainView.HSplitTop(60.0f, &TabBar, &MainView);
+			MainView.HSplitTop(BarHeight, &TabBar, &MainView);
 			RenderMenubar(TabBar);
 
 			// news is not implemented yet
@@ -1624,17 +1663,22 @@ int CMenus::Render()
 			// quit button
 			{
 				CUIRect Button;
-				float TopOffset = 35.0f;
+				float TopOffset = 27.0f;
 				Screen.HSplitTop(TopOffset, &Button, 0);
-				Button.VSplitRight(TopOffset - 3.0f, 0, &Button);
+				Button.VSplitRight(TopOffset/* - 3.0f*/, 0, &Button);
 				static CButtonContainer s_QuitButton;
 
 				// draw red-blending button
-				vec4 Color = mix(vec4(1.f, 1.f, 1.f, 0.25f), vec4(1.f/0xff*0xf9, 1.f/0xff*0x2b, 1.f/0xff*0x2b, 0.75f), ButtonFade(&s_QuitButton, 0.6f, 0)/0.6f);
-				RenderTools()->DrawUIRect(&Button, Color, CUI::CORNER_BL|CUI::CORNER_BR|CUI::CORNER_TL, 5.0f);
+				vec4 Color = mix(vec4(0.f, 0.f, 0.f, 0.25f), vec4(1.f/0xff*0xf9, 1.f/0xff*0x2b, 1.f/0xff*0x2b, 0.75f), ButtonFade(&s_QuitButton, 0.6f, 0)/0.6f);
+				RenderTools()->DrawUIRect(&Button, Color, CUI::CORNER_BL, 5.0f);
 
 				// draw non-blending X
-				if(DoButton_SpriteCleanID(&s_QuitButton, IMAGE_TOOLICONS, SPRITE_TOOL_X_A, &Button, false))
+				CUIRect XText = Button;
+				// XText.HMargin(Button.h>=20.0f?2.0f:1.0f, &XText);
+				
+				UI()->DoLabel(&XText, "\xE2\x9C\x95", XText.h*ms_FontmodHeight, CUI::ALIGN_CENTER);
+				if(UI()->DoButtonLogic(s_QuitButton.GetID(), "\xE2\x9C\x95", 0, &Button))
+				// if(DoButton_SpriteCleanID(&s_QuitButton, IMAGE_FRIENDICONS, SPRITE_FRIEND_X_A, &Button, false))
 					m_Popup = POPUP_QUIT;
 			}
 
@@ -1955,6 +1999,8 @@ int CMenus::Render()
 			for(int i = 0; i < m_pClient->m_pCountryFlags->Num(); ++i)
 			{
 				const CCountryFlags::CCountryFlag *pEntry = m_pClient->m_pCountryFlags->GetByIndex(i);
+				if(pEntry->m_Blocked)
+					continue;
 				if(pEntry->m_CountryCode == ActSelection)
 					OldSelected = i;
 

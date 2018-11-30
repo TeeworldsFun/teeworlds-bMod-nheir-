@@ -498,6 +498,7 @@ public:
 		pCursor->m_LineCount = 1;
 		pCursor->m_LineWidth = -1;
 		pCursor->m_Flags = Flags;
+		pCursor->m_GlyphCount = 0;
 		pCursor->m_CharCount = 0;
 	}
 
@@ -555,7 +556,7 @@ public:
 		FakeToScreenX = (Graphics()->ScreenWidth()/(ScreenX1-ScreenX0));
 		FakeToScreenY = (Graphics()->ScreenHeight()/(ScreenY1-ScreenY0));
 		ShadowOffset.x /= FakeToScreenX;
-		ShadowOffset.y /= FakeToScreenX;
+		ShadowOffset.y /= FakeToScreenY;
 
 		CQuadChar aTextQuads[1024];
 		int TextQuadCount = 0;
@@ -672,7 +673,7 @@ public:
 				{
 					// word can't be fitted in one line, cut it
 					CTextCursor Cutter = *pCursor;
-					Cutter.m_CharCount = 0;
+					Cutter.m_GlyphCount = 0;
 					Cutter.m_X = DrawX;
 					Cutter.m_Y = DrawY;
 					Cutter.m_Flags &= ~TEXTFLAG_RENDER;
@@ -680,7 +681,7 @@ public:
 
 					TextDeferredRenderEx(&Cutter, (const char *)pCurrent, Wlen, aQuadChar, QuadCharMaxCount,
 										 pQuadCharCount, pFontTexture);
-					Wlen = Cutter.m_CharCount;
+					Wlen = Cutter.m_GlyphCount;
 					NewLine = 1;
 
 					if(Wlen <= 3) // if we can't place 3 chars of the word on this line, take the next
@@ -699,6 +700,7 @@ public:
 			int NextCharacter = str_utf8_decode(&pTmp);
 			while(pCurrent < pBatchEnd)
 			{
+				pCursor->m_CharCount += pTmp-pCurrent;
 				int Character = NextCharacter;
 				pCurrent = pTmp;
 				NextCharacter = str_utf8_decode(&pTmp);
@@ -742,7 +744,7 @@ public:
 					}
 
 					DrawX += Advance*Size;
-					pCursor->m_CharCount++;
+					pCursor->m_GlyphCount++;
 				}
 			}
 
@@ -861,14 +863,14 @@ public:
 					{
 						// word can't be fitted in one line, cut it
 						CTextCursor Cutter = *pCursor;
-						Cutter.m_CharCount = 0;
+						Cutter.m_GlyphCount = 0;
 						Cutter.m_X = DrawX;
 						Cutter.m_Y = DrawY;
 						Cutter.m_Flags &= ~TEXTFLAG_RENDER;
 						Cutter.m_Flags |= TEXTFLAG_STOP_AT_END;
 
 						TextEx(&Cutter, (const char *)pCurrent, Wlen);
-						Wlen = Cutter.m_CharCount;
+						Wlen = Cutter.m_GlyphCount;
 						NewLine = 1;
 
 						if(Wlen <= 3) // if we can't place 3 chars of the word on this line, take the next
@@ -887,6 +889,7 @@ public:
 				int NextCharacter = str_utf8_decode(&pTmp);
 				while(pCurrent < pBatchEnd)
 				{
+					pCursor->m_CharCount += pTmp-pCurrent;
 					int Character = NextCharacter;
 					pCurrent = pTmp;
 					NextCharacter = str_utf8_decode(&pTmp);
@@ -922,7 +925,7 @@ public:
 						}
 
 						DrawX += Advance*Size;
-						pCursor->m_CharCount++;
+						pCursor->m_GlyphCount++;
 					}
 				}
 
@@ -946,6 +949,38 @@ public:
 
 		if(GotNewLine)
 			pCursor->m_Y = DrawY;
+	}
+
+	float TextGetLineBaseY(const CTextCursor *pCursor)
+	{
+		CFont *pFont = pCursor->m_pFont;
+		CFontSizeData *pSizeData = NULL;
+
+		float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+		float Size = pCursor->m_FontSize;
+
+		// to correct coords, convert to screen coords, round, and convert back
+		Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+		float FakeToScreenY = (Graphics()->ScreenHeight()/(ScreenY1-ScreenY0));
+		int ActualY = (int)(pCursor->m_Y * FakeToScreenY);
+		float CursorY = ActualY / FakeToScreenY;
+
+		// same with size
+		int ActualSize = (int)(Size * FakeToScreenY);
+		Size = ActualSize / FakeToScreenY;
+
+		// fetch pFont data
+		if(!pFont)
+			pFont = m_pDefaultFont;
+
+		if(!pFont)
+			return 0;
+
+		pSizeData = GetSize(pFont, ActualSize);
+		RenderSetup(pFont, ActualSize);
+		CFontChar *pChr = GetChar(pFont, pSizeData, ' ');
+		return CursorY + pChr->m_OffsetY*Size + pChr->m_Height*Size;
 	}
 
 };

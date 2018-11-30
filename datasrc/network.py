@@ -6,7 +6,7 @@ Emoticons = Enum("EMOTICON", ["OOP", "EXCLAMATION", "HEARTS", "DROP", "DOTDOT", 
 Votes = Enum("VOTE", ["UNKNOWN", "START_OP", "START_KICK", "START_SPEC", "END_ABORT", "END_PASS", "END_FAIL"])
 ChatModes = Enum("CHAT", ["NONE", "ALL", "TEAM", "WHISPER"])
 
-PlayerFlags = Flags("PLAYERFLAG", ["ADMIN", "CHATTING", "SCOREBOARD", "READY", "DEAD", "WATCHING"])
+PlayerFlags = Flags("PLAYERFLAG", ["ADMIN", "CHATTING", "SCOREBOARD", "READY", "DEAD", "WATCHING", "BOT"])
 GameFlags = Flags("GAMEFLAG", ["TEAMS", "FLAGS", "SURVIVAL"])
 GameStateFlags = Flags("GAMESTATEFLAG", ["WARMUP", "SUDDENDEATH", "ROUNDOVER", "GAMEOVER", "PAUSED", "STARTCOUNTDOWN"])
 CoreEventFlags = Flags("COREEVENTFLAG", ["GROUND_JUMP", "AIR_JUMP", "HOOK_ATTACH_PLAYER", "HOOK_ATTACH_GROUND", "HOOK_HIT_NOHOOK"])
@@ -243,9 +243,14 @@ Messages = [
 		NetString("m_pMessage"),
 	]),
 
+	NetMessage("Sv_Broadcast", [
+		NetString("m_pMessage"),
+	]),
+
 	NetMessage("Sv_Chat", [
 		NetIntRange("m_Mode", 0, 'NUM_CHATS-1'),
 		NetIntRange("m_ClientID", -1, 'MAX_CLIENTS-1'),
+		NetIntRange("m_TargetID", -1, 'MAX_CLIENTS-1'),
 		NetStringStrict("m_pMessage"),
 	]),
 

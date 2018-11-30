@@ -53,7 +53,8 @@ private:
 	int DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, bool Active);
 	int DoButton_Menu(CButtonContainer *pBC, const char *pText, int Checked, const CUIRect *pRect, const char *pImageName=0, int Corners=CUI::CORNER_ALL, float r=5.0f, float FontFactor=0.0f, vec4 ColorHot=vec4(1.0f, 1.0f, 1.0f, 0.75f), bool TextFade=true);
 	int DoButton_MenuTab(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Corners);
-	int DoButton_MenuTabTop(CButtonContainer *pBC, const char *pText, int Checked, const CUIRect *pRect, int Corners=CUI::CORNER_ALL, float r=5.0f, float FontFactor=0.0f);
+	int DoButton_MenuTabTop(CButtonContainer *pBC, const char *pText, int Checked, const CUIRect *pRect, float Alpha=1.0f, float FontAlpha=1.0f, int Corners=CUI::CORNER_ALL, float r=5.0f, float FontFactor=0.0f);
+	void DoButton_MenuTabTop_Dummy(const char *pText, int Checked, const CUIRect *pRect, float Alpha);
 	int DoButton_Customize(CButtonContainer *pBC, IGraphics::CTextureHandle Texture, int SpriteID, const CUIRect *pRect, float ImageRatio);
 
 	int DoButton_CheckBox_Common(const void *pID, const char *pText, const char *pBoxText, const CUIRect *pRect, bool Checked=false);
@@ -173,6 +174,9 @@ private:
 		SETTINGS_CONTROLS,
 		SETTINGS_GRAPHICS,
 		SETTINGS_SOUND,
+
+		ACTLB_LANG=0,
+		ACTLB_THEME,
 	};
 
 	int m_GamePage;
@@ -187,6 +191,7 @@ private:
 	vec2 m_MousePos;
 	vec2 m_PrevMousePos;
 	bool m_PopupActive;
+	int m_ActiveListBox;
 
 	// images
 	struct CMenuImage
@@ -200,6 +205,24 @@ private:
 	static int MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser);
 
 	const CMenuImage *FindMenuImage(const char* pName);
+
+	// themes
+	class CTheme
+	{
+	public:
+		CTheme() {}
+		CTheme(const char *n, bool HasDay, bool HasNight) : m_Name(n), m_HasDay(HasDay), m_HasNight(HasNight) {}
+
+		string m_Name;
+		bool m_HasDay;
+		bool m_HasNight;
+		IGraphics::CTextureHandle m_IconTexture;
+		bool operator<(const CTheme &Other) { return m_Name < Other.m_Name; }
+	};
+	sorted_array<CTheme> m_lThemes;
+
+	static int ThemeScan(const char *pName, int IsDir, int DirType, void *pUser);
+	static int ThemeIconScan(const char *pName, int IsDir, int DirType, void *pUser);
 
 	int64 m_LastInput;
 
@@ -219,6 +242,7 @@ private:
 	static float ms_ButtonHeight;
 	static float ms_ListheaderHeight;
 	static float ms_FontmodHeight;
+	static float ms_BackgroundAlpha;
 
 	// for settings
 	bool m_NeedRestartGraphics;
@@ -509,6 +533,7 @@ private:
 
 	// found in menus_settings.cpp
 	void RenderLanguageSelection(CUIRect MainView, bool Header=true);
+	void RenderThemeSelection(CUIRect MainView, bool Header=true);
 	void RenderHSLPicker(CUIRect Picker);
 	void RenderSkinSelection(CUIRect MainView);
 	void RenderSkinPartSelection(CUIRect MainView);
