@@ -1098,7 +1098,7 @@ void CServer::GenerateServerInfo(CPacker *pPacker, int Token)
 	int PlayerCount = 0, ClientCount = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(m_aClients[i].m_State != CClient::STATE_EMPTY && !m_aClients[i].m_IsBot)
+		if(m_aClients[i].m_State != CClient::STATE_EMPTY)
 		{
 			if(GameServer()->IsClientPlayer(i))
 				PlayerCount++;
@@ -1136,13 +1136,13 @@ void CServer::GenerateServerInfo(CPacker *pPacker, int Token)
 	{
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			if(m_aClients[i].m_State != CClient::STATE_EMPTY && !m_aClients[i].m_IsBot)
+			if(m_aClients[i].m_State != CClient::STATE_EMPTY)
 			{
 				pPacker->AddString(ClientName(i), MAX_NAME_LENGTH); // client name
 				pPacker->AddString(ClientClan(i), MAX_CLAN_LENGTH); // client clan
 				pPacker->AddInt(m_aClients[i].m_Country); // client country
 				pPacker->AddInt(m_aClients[i].m_Score); // client score
-				pPacker->AddInt(GameServer()->IsClientPlayer(i)?0:1); // flag spectator=1, bot=2 (player=0)
+				pPacker->AddInt(GameServer()->IsClientPlayer(i) ? 0 : (GameServer()->IsClientBot(i) ? 2 : 1)); // flag spectator=1, bot=2 (player=0)
 			}
 		}
 	}

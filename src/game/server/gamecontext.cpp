@@ -1559,7 +1559,12 @@ bool CGameContext::IsClientReady(int ClientID) const
 
 bool CGameContext::IsClientPlayer(int ClientID) const
 {
-	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->GetTeam() == TEAM_SPECTATORS ? false : true;
+	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->GetTeam() != TEAM_SPECTATORS && !m_apPlayers[ClientID]->IsBot();
+}
+
+bool CGameContext::IsClientBot(int ClientID) const
+{
+	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsBot();
 }
 
 const char *CGameContext::GameType() const { return m_pController && m_pController->GetGameType() ? m_pController->GetGameType() : ""; }

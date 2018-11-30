@@ -183,6 +183,7 @@ public:
 
 	virtual bool IsClientReady(int ClientID) const;
 	virtual bool IsClientPlayer(int ClientID) const;
+	virtual bool IsClientBot(int ClientID) const;
 
 	virtual const char *GameType() const;
 	virtual const char *Version() const;
