@@ -1605,6 +1605,11 @@ bool CGameContext::AddBot(int i) {
 	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
 	Server()->SetClientName(i, g_aBotName[i % 16]);
 	Server()->SetClientClan(i, g_BotClan);
+	for(int p = 0; p < 6; p++)
+	{
+		m_apPlayers[i]->m_TeeInfos.m_aUseCustomColors[p] = 1;
+		m_apPlayers[i]->m_TeeInfos.m_aSkinPartColors[p] = random_int() & 0xffffffff;
+	}
 	OnClientEnter(i);
 	//m_pController->OnPlayerConnect(m_apPlayers[i]);
 	return true;
