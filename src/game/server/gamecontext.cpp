@@ -97,22 +97,19 @@ class CCharacter *CGameContext::GetPlayerChar(int ClientID)
 	return m_apPlayers[ClientID]->GetCharacter();
 }
 
-void CGameContext::CreateDamageInd(vec2 Pos, float Angle, int Amount)
+void CGameContext::CreateDamage(vec2 Pos, int Id, vec2 Source, int HealthAmount, int ArmorAmount, bool Self)
 {
-	float a = 3*pi/2 + Angle;
-	//float a = get_angle(dir);
-	float s = a-pi/3;
-	float e = a+pi/3;
-	for(int i = 0; i < Amount; i++)
+	float f = angle(Source);
+	CNetEvent_Damage *pEvent = (CNetEvent_Damage *)m_Events.Create(NETEVENTTYPE_DAMAGE, sizeof(CNetEvent_Damage));
+	if(pEvent)
 	{
-		float f = mix(s, e, float(i+1)/float(Amount+2));
-		CNetEvent_DamageInd *pEvent = (CNetEvent_DamageInd *)m_Events.Create(NETEVENTTYPE_DAMAGEIND, sizeof(CNetEvent_DamageInd));
-		if(pEvent)
-		{
-			pEvent->m_X = (int)Pos.x;
-			pEvent->m_Y = (int)Pos.y;
-			pEvent->m_Angle = (int)(f*256.0f);
-		}
+		pEvent->m_X = (int)Pos.x;
+		pEvent->m_Y = (int)Pos.y;
+		pEvent->m_ClientID = Id;
+		pEvent->m_Angle = (int)(f*256.0f);
+		pEvent->m_HealthAmount = HealthAmount;
+		pEvent->m_ArmorAmount = ArmorAmount;
+		pEvent->m_Self = Self;
 	}
 }
 
@@ -153,7 +150,7 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, int MaxDamag
 			Force = normalize(Diff) * MaxForce;
 		float Factor = 1 - clamp((l-InnerRadius)/(Radius-InnerRadius), 0.0f, 1.0f);
 		if((int)(Factor * MaxDamage))
-			apEnts[i]->TakeDamage(Force * Factor, (int)(Factor * MaxDamage), Owner, Weapon);
+			apEnts[i]->TakeDamage(Force * Factor, Diff*-1, (int)(Factor * MaxDamage), Owner, Weapon);
 	}
 }
 
@@ -282,7 +279,7 @@ void CGameContext::SendSettings(int ClientID)
 	Msg.m_SpecVote = g_Config.m_SvVoteSpectate;
 	Msg.m_TeamLock = m_LockTeams != 0;
 	Msg.m_TeamBalance = g_Config.m_SvTeambalanceTime != 0;
-	Msg.m_PlayerSlots = Server()->MaxClients()-g_Config.m_SvSpectatorSlots;
+	Msg.m_PlayerSlots = g_Config.m_SvPlayerSlots;
 	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientID);
 }
 
@@ -628,6 +625,10 @@ void CGameContext::OnClientEnter(int ClientID)
 	NewClientInfoMsg.m_pClan = Server()->ClientClan(ClientID);
 	NewClientInfoMsg.m_Country = Server()->ClientCountry(ClientID);
 	NewClientInfoMsg.m_Silent = false;
+
+	if(g_Config.m_SvSilentSpectatorMode && m_apPlayers[ClientID]->GetTeam() == TEAM_SPECTATORS)
+		NewClientInfoMsg.m_Silent = true;
+
 	for(int p = 0; p < 6; p++)
 	{
 		NewClientInfoMsg.m_apSkinPartNames[p] = m_apPlayers[ClientID]->m_TeeInfos.m_aaSkinPartNames[p];
@@ -707,6 +708,11 @@ void CGameContext::OnClientTeamChange(int ClientID)
 
 void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 {
+	AbortVoteOnDisconnect(ClientID);
+	m_pController->OnPlayerDisconnect(m_apPlayers[ClientID]);
+	delete m_apPlayers[ClientID];
+	m_apPlayers[ClientID] = 0;
+
 	// update clients on drop
 	if(Server()->ClientIngame(ClientID))
 	{
@@ -722,13 +728,10 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 		Msg.m_ClientID = ClientID;
 		Msg.m_pReason = pReason;
 		Msg.m_Silent = false;
+		if(g_Config.m_SvSilentSpectatorMode && m_apPlayers[ClientID]->GetTeam() == TEAM_SPECTATORS)
+			Msg.m_Silent = true;
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_NORECORD, -1);
 	}
-
-	AbortVoteOnDisconnect(ClientID);
-	m_pController->OnPlayerDisconnect(m_apPlayers[ClientID]);
-	delete m_apPlayers[ClientID];
-	m_apPlayers[ClientID] = 0;
 
 	m_VoteUpdate = true;
 }
@@ -1442,7 +1445,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Chain("sv_vote_kick_min", ConchainSettingUpdate, this);
 	Console()->Chain("sv_vote_spectate", ConchainSettingUpdate, this);
 	Console()->Chain("sv_teambalance_time", ConchainSettingUpdate, this);
-	Console()->Chain("sv_spectator_slots", ConchainSettingUpdate, this);
+	Console()->Chain("sv_player_slots", ConchainSettingUpdate, this);
 
 	Console()->Chain("sv_scorelimit", ConchainGameinfoUpdate, this);
 	Console()->Chain("sv_timelimit", ConchainGameinfoUpdate, this);
@@ -1639,7 +1642,7 @@ void CGameContext::CheckBotNumber() {
 	}
 	if(!g_Config.m_SvBotAlwaysEnable && !ClientCount)
 		BotNumber += g_Config.m_SvBotSlots;
-	int MaxBotSlots = min(g_Config.m_SvBotSlots, Server()->MaxClients() - g_Config.m_SvSpectatorSlots - PlayerCount);
+	int MaxBotSlots = min(g_Config.m_SvBotSlots, g_Config.m_SvPlayerSlots - PlayerCount);
 	// Remove bot excedent
 	if (BotNumber - MaxBotSlots > 0)	{
 		int FirstBot = 0;

@@ -184,6 +184,7 @@ void CGameClient::OnConsoleInit()
 	m_All.Add(m_pEffects); // doesn't render anything, just updates effects
 	m_All.Add(m_pParticles); // doesn't render anything, just updates all the particles
 	m_All.Add(m_pBinds);
+	m_All.Add(&m_pBinds->m_SpecialBinds);
 	m_All.Add(m_pControls);
 	m_All.Add(m_pCamera);
 	m_All.Add(m_pSounds);
@@ -208,6 +209,7 @@ void CGameClient::OnConsoleInit()
 	m_All.Add(&gs_Scoreboard);
 	m_All.Add(m_pMotd);
 	m_All.Add(m_pMenus);
+	m_All.Add(&m_pMenus->m_Binder);
 	m_All.Add(m_pGameConsole);
 
 	// build the input stack
@@ -283,7 +285,7 @@ void CGameClient::OnInit()
 	// setup load amount// load textures
 	for(int i = 0; i < g_pData->m_NumImages; i++)
 	{
-		g_pData->m_aImages[i].m_Id = Graphics()->LoadTexture(g_pData->m_aImages[i].m_pFilename, IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, g_pData->m_aImages[i].m_Flag ? IGraphics::TEXLOAD_NOMIPMAPS : 0);
+		g_pData->m_aImages[i].m_Id = Graphics()->LoadTexture(g_pData->m_aImages[i].m_pFilename, IStorage::TYPE_ALL, CImageInfo::FORMAT_AUTO, g_pData->m_aImages[i].m_Flag ? IGraphics::TEXLOAD_LINEARMIPMAPS : 0);
 		m_pMenus->RenderLoading();
 	}
 
@@ -820,10 +822,10 @@ void CGameClient::ProcessEvents()
 		IClient::CSnapItem Item;
 		const void *pData = Client()->SnapGetItem(SnapType, Index, &Item);
 
-		if(Item.m_Type == NETEVENTTYPE_DAMAGEIND)
+		if(Item.m_Type == NETEVENTTYPE_DAMAGE)
 		{
-			CNetEvent_DamageInd *ev = (CNetEvent_DamageInd *)pData;
-			m_pEffects->DamageIndicator(vec2(ev->m_X, ev->m_Y), direction(ev->m_Angle/256.0f));
+			CNetEvent_Damage *ev = (CNetEvent_Damage *)pData;
+			m_pEffects->DamageIndicator(vec2(ev->m_X, ev->m_Y), ev->m_HealthAmount + ev->m_ArmorAmount);
 		}
 		else if(Item.m_Type == NETEVENTTYPE_EXPLOSION)
 		{
