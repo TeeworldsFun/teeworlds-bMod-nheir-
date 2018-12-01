@@ -1593,7 +1593,7 @@ bool CGameContext::AddBot(int i) {
 	m_apPlayers[i] = new(i) CPlayer(this, i, false);
 	m_apPlayers[i]->m_IsBot = true;
 	m_apPlayers[i]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[i]);
-	Server()->SetClientName(i, g_aBotName[i]);
+	Server()->SetClientName(i, g_aBotName[i % 16]);
 	Server()->SetClientClan(i, g_BotClan);
 	OnClientEnter(i);
 	//m_pController->OnPlayerConnect(m_apPlayers[i]);
@@ -1619,7 +1619,7 @@ bool CGameContext::ReplacePlayerByBot(int ClientID) {
 		return false;
 	m_apPlayers[ClientID]->m_IsBot = true;
 	m_apPlayers[ClientID]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[ClientID]);
-	Server()->SetClientName(ClientID, g_aBotName[ClientID]);
+	Server()->SetClientName(ClientID, g_aBotName[ClientID % 16]);
 	Server()->SetClientClan(ClientID, g_BotClan);
 	dbg_msg("context","Replace player by bot at slot: %d", ClientID);
 	return true;
