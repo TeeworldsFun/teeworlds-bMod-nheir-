@@ -478,6 +478,11 @@ void CGameContext::OnTick()
 		m_apPlayers[i]->OnDirectInput(&Input);
 	}
 
+	int ClientCount = 0;
+	for(int i = 0; i < MAX_CLIENTS ; i++)
+		if(m_apPlayers[i] && !m_apPlayers[i]->IsBot())
+			ClientCount++;
+
 	// copy tuning
 	m_World.m_Core.m_Tuning = m_Tuning;
 	m_World.Tick();
@@ -485,12 +490,16 @@ void CGameContext::OnTick()
 	//if(world.paused) // make sure that the game object always updates
 	m_pController->Tick();
 
-	for(int i = 0; i < MAX_CLIENTS; i++)
+	// Don't tick bots if the server is empty
+	if(g_Config.m_SvBotAlwaysEnable == 2 || ClientCount > 0)
 	{
-		if(m_apPlayers[i])
+		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			m_apPlayers[i]->Tick();
-			m_apPlayers[i]->PostTick();
+			if(m_apPlayers[i])
+			{
+				m_apPlayers[i]->Tick();
+				m_apPlayers[i]->PostTick();
+			}
 		}
 	}
 
