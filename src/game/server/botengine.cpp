@@ -290,7 +290,7 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 
 		for(int c = 0; c < MAX_CLIENTS; c++)
 		{
-			m_aPaths[c].m_MaxSize = m_Graph.m_Diameter+2;
+			m_aPaths[c].m_MaxSize = m_Graph.m_Diameter+3;
 			m_aPaths[c].m_pVertices = (vec2*) mem_alloc(m_aPaths[c].m_MaxSize*sizeof(vec2),1);
 			m_aPaths[c].m_pSnapID = (int*) mem_alloc(m_aPaths[c].m_MaxSize*sizeof(int),1);
 			for(int i = 0 ; i < m_aPaths[c].m_MaxSize; i++)
