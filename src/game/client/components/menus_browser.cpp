@@ -604,7 +604,13 @@ int CMenus::DoBrowserEntry(const void *pID, CUIRect View, const CServerInfo *pEn
 		View.VSplitLeft(160.0f, &Info, &View);
 		RenderDetailInfo(Info, pEntry);
 
+		CUIRect NewClipArea = *UI()->ClipArea();
+		CUIRect OldClipArea = NewClipArea;
+		NewClipArea.x = View.x;
+		NewClipArea.w = View.w;
+		UI()->ClipEnable(&NewClipArea);
 		RenderDetailScoreboard(View, pEntry, 4);
+		UI()->ClipEnable(&OldClipArea);
 
 		if(ReturnValue && UI()->MouseInside(&View))
 			ReturnValue++;
@@ -890,7 +896,7 @@ void CMenus::RenderServerbrowserOverlay()
 			RenderTools()->DrawUIRect(&View, vec4(1.0f, 1.0f, 1.0f, 0.75f), CUI::CORNER_ALL, 6.0f);
 
 			View.y += 2.0f;
-			UI()->DoLabel(&View, Localize("no players"), View.h*ms_FontmodHeight*0.8f, CUI::ALIGN_CENTER);
+			UI()->DoLabel(&View, Localize("no players", "server browser message"), View.h*ms_FontmodHeight*0.8f, CUI::ALIGN_CENTER);
 		}
 
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1255,7 +1261,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View)
 	// clear button
 	{
 		static CButtonContainer s_ClearButton;
-		if(DoButton_SpriteID(&s_ClearButton, IMAGE_TOOLICONS, SPRITE_TOOL_X_A, false, &Button, CUI::CORNER_ALL, 5.0f, false))
+		if(DoButton_SpriteID(&s_ClearButton, IMAGE_TOOLICONS, SPRITE_TOOL_X_A, false, &Button, CUI::CORNER_ALL, 5.0f, true))
 		{
 			g_Config.m_BrFilterString[0] = 0;
 			UI()->SetActiveItem(&g_Config.m_BrFilterString);
@@ -1343,7 +1349,8 @@ void CMenus::RenderServerbrowserFriendTab(CUIRect View)
 	CUIRect BottomArea;
 	const float FontSize = 10.0f;
 	static bool s_ListExtended[NUM_FRIEND_TYPES] = { 1, 1, 0 };
-	static const char *s_HeaderCaption[NUM_FRIEND_TYPES] = { Localize("Online players (%d)"), Localize("Online clanmates (%d)"), Localize("Offline (%d)") };
+	static const char *s_HeaderCaption[NUM_FRIEND_TYPES] =
+		{ Localize("Online players (%d)"), Localize("Online clanmates (%d)"), Localize("Offline (%d)", "friends (server browser)") };
 
 	View.HSplitBottom(3*ms_ListheaderHeight, &View, &BottomArea);
 
@@ -1455,9 +1462,9 @@ void CMenus::RenderServerbrowserFriendTab(CUIRect View)
 					Rect.HSplitTop(ms_ListheaderHeight, &Button, &Rect);
 					Button.VSplitLeft(2.0f, 0, &Button);
 					if(m_lFriendList[i][f].m_IsPlayer)
-						str_format(aBuf, sizeof(aBuf), Localize("Playing '%s' on '%s'"), m_lFriendList[i][f].m_pServerInfo->m_aGameType, m_lFriendList[i][f].m_pServerInfo->m_aMap);
+						str_format(aBuf, sizeof(aBuf), Localize("Playing '%s' on '%s'", "Playing '(gametype)' on '(map)'"), m_lFriendList[i][f].m_pServerInfo->m_aGameType, m_lFriendList[i][f].m_pServerInfo->m_aMap);
 					else
-						str_format(aBuf, sizeof(aBuf), Localize("Watching '%s' on '%s'"), m_lFriendList[i][f].m_pServerInfo->m_aGameType, m_lFriendList[i][f].m_pServerInfo->m_aMap);
+						str_format(aBuf, sizeof(aBuf), Localize("Watching '%s' on '%s'", "Watching '(gametype)' on '(map)'"), m_lFriendList[i][f].m_pServerInfo->m_aGameType, m_lFriendList[i][f].m_pServerInfo->m_aMap);
 					Button.HMargin(2.0f, &Button);
 					UI()->DoLabelScaled(&Button, aBuf, FontSize - 2, CUI::ALIGN_LEFT);
 				}
@@ -1475,7 +1482,7 @@ void CMenus::RenderServerbrowserFriendTab(CUIRect View)
 					Button.Margin((Button.h - ms_ListheaderHeight + 2.0f) / 2, &Button);
 					RenderTools()->DrawUIRect(&Button, vec4(1.0f, 1.0f, 1.0f, 0.15f), CUI::CORNER_ALL, 4.0f);
 					Label.HMargin(2.0f, &Label);
-					UI()->DoLabelScaled(&Button, Localize("Join"), FontSize, CUI::ALIGN_CENTER);
+					UI()->DoLabelScaled(&Button, Localize("Join", "Join a server"), FontSize, CUI::ALIGN_CENTER);
 					if(UI()->MouseInside(&Button) && Input()->KeyPress(KEY_MOUSE_1))		// todo: fix me
 					{
 						str_copy(g_Config.m_UiServerAddress, m_lFriendList[i][f].m_pServerInfo->m_aAddress, sizeof(g_Config.m_UiServerAddress));
@@ -1728,7 +1735,7 @@ void CMenus::RenderServerbrowserFilterTab(CUIRect View)
 	Icon.VSplitLeft(10.0f, 0, &Icon);
 	Icon.VSplitLeft(40.0f, &Button, 0);
 	static CButtonContainer s_ClearGametypes;
-	if(DoButton_MenuTabTop(&s_ClearGametypes, Localize("Clear"), false, &Button))
+	if(DoButton_MenuTabTop(&s_ClearGametypes, Localize("Clear", "clear gametype filters"), false, &Button))
 	{
 		for(int i = 0; i < CServerFilterInfo::MAX_GAMETYPES; ++i)
 		{
@@ -1951,8 +1958,6 @@ void CMenus::RenderDetailScoreboard(CUIRect View, const CServerInfo *pInfo, int 
 
 		CUIRect Scroll;
 
-		UI()->ClipEnable(&View);
-
 		float RowWidth = (RowCount == 0) ? View.w : (View.w * 0.25f);
 		float LineHeight = 20.0f;
 
@@ -2090,8 +2095,6 @@ void CMenus::RenderDetailScoreboard(CUIRect View, const CServerInfo *pInfo, int 
 
 			++Count;
 		}
-
-		UI()->ClipDisable();
 	}
 }
 
@@ -2113,7 +2116,9 @@ void CMenus::RenderServerbrowserServerDetail(CUIRect View, const CServerInfo *pI
 	//RenderTools()->DrawUIRect(&View, vec4(0, 0, 0, 0.15f), CUI::CORNER_B, 4.0f);
 	ServerHeader.HMargin(2.0f, &ServerHeader);
 	UI()->DoLabelScaled(&ServerHeader, Localize("Scoreboard"), FontSize + 2.0f, CUI::ALIGN_CENTER);
+	UI()->ClipEnable(&ServerScoreboard);
 	RenderDetailScoreboard(ServerScoreboard, pInfo, 0);
+	UI()->ClipDisable();
 }
 
 void CMenus::FriendlistOnUpdate()

@@ -95,14 +95,14 @@ const char *CGameClient::GetTeamName(int Team, bool Teamplay) const
 	if(Teamplay)
 	{
 		if(Team == TEAM_RED)
-			return Localize("red team");
+			return Localize("red team", "'X joined the <red team>' (server message)");
 		else if(Team == TEAM_BLUE)
-			return Localize("blue team");
+			return Localize("blue team", "'X joined the <blue team>' (server message)");
 	}
 	else if(Team == 0)
-		return Localize("game");
+		return Localize("game", "'X joined the <game>' (server message)");
 
-	return Localize("spectators");
+	return Localize("spectators", "'X joined the <spectators>' (server message)");
 }
 
 enum
@@ -328,7 +328,6 @@ void CGameClient::OnUpdate()
 	}
 }
 
-
 int CGameClient::OnSnapInput(int *pData)
 {
 	return m_pControls->SnapInput(pData);
@@ -367,13 +366,13 @@ void CGameClient::OnReset()
 
 	m_LocalClientID = -1;
 	m_TeamCooldownTick = 0;
+	m_TeamChangeTime = 0.0f;
 	mem_zero(&m_GameInfo, sizeof(m_GameInfo));
 	m_DemoSpecMode = SPEC_FREEVIEW;
 	m_DemoSpecID = -1;
 	m_Tuning = CTuningParams();
 	m_MuteServerBroadcast = false;
 }
-
 
 void CGameClient::UpdatePositions()
 {
@@ -422,7 +421,6 @@ void CGameClient::UpdatePositions()
 	}
 }
 
-
 void CGameClient::EvolveCharacter(CNetObj_Character *pCharacter, int Tick)
 {
 	CWorldCore TempWorld;
@@ -441,7 +439,6 @@ void CGameClient::EvolveCharacter(CNetObj_Character *pCharacter, int Tick)
 
 	TempCore.Write(pCharacter);
 }
-
 
 void CGameClient::OnRender()
 {
@@ -560,10 +557,10 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 				m_pSounds->Enqueue(CSounds::CHN_GLOBAL, SOUND_CTF_CAPTURE);
 				int ClientID = clamp(aParaI[1], 0, MAX_CLIENTS - 1);
 				if(aParaI[2] <= 60*Client()->GameTickSpeed())
-					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s' (%.2f seconds)"), aParaI[0] ? Localize("blue") : Localize("red"),
+					str_format(aBuf, sizeof(aBuf), Localize("The %s was captured by '%2d: %s' (%.2f seconds)"), aParaI[0] ? Localize("blue flag") : Localize("red flag"),
 						ClientID, g_Config.m_ClShowsocial ? m_aClients[ClientID].m_aName : "", aParaI[2]/(float)Client()->GameTickSpeed());
 				else
-					str_format(aBuf, sizeof(aBuf), Localize("The %s flag was captured by '%2d: %s'"), aParaI[0] ? Localize("blue") : Localize("red"),
+					str_format(aBuf, sizeof(aBuf), Localize("The %s was captured by '%2d: %s'"), aParaI[0] ? Localize("blue flag") : Localize("red flag"),
 						ClientID, g_Config.m_ClShowsocial ? m_aClients[ClientID].m_aName : "");
 				m_pChat->AddLine(-1, 0, aBuf);
 			}
@@ -623,6 +620,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 				return;
 			}
 			m_LocalClientID = pMsg->m_ClientID;
+			m_TeamChangeTime = Client()->LocalTime();
 		}
 		else
 		{
@@ -744,6 +742,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker)
 
 			if(pMsg->m_ClientID == m_LocalClientID)
 				m_TeamCooldownTick = pMsg->m_CooldownTick;
+			m_TeamChangeTime = Client()->LocalTime();
 		}
 
 		if(pMsg->m_Silent == 0)

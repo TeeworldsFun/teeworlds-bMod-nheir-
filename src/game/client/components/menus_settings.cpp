@@ -790,6 +790,8 @@ void CMenus::RenderThemeSelection(CUIRect MainView, bool Header)
 
 	if(m_lThemes.size() == 0) // not loaded yet
 	{
+		if(!g_Config.m_ClShowMenuMap)
+			str_copy(g_Config.m_ClMenuMap, "", sizeof(g_Config.m_ClMenuMap)); // cl_menu_map otherwise resets to default on loading
 		m_lThemes.add(CTheme("", false, false)); // no theme
 		Storage()->ListDirectory(IStorage::TYPE_ALL, "ui/themes", ThemeScan, (CMenus*)this);
 		Storage()->ListDirectory(IStorage::TYPE_ALL, "ui/themes", ThemeIconScan, (CMenus*)this);
@@ -993,15 +995,15 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 
 	GameRight.HSplitTop(Spacing, 0, &GameRight);
 	GameRight.HSplitTop(ButtonHeight, &Button, &GameRight);
-	static int s_Showsocial = 0;
-	if(DoButton_CheckBox(&s_Showsocial, Localize("Show social"), g_Config.m_ClShowsocial, &Button))
-		g_Config.m_ClShowsocial ^= 1;
-
-	GameRight.HSplitTop(Spacing, 0, &GameRight);
-	GameRight.HSplitTop(ButtonHeight, &Button, &GameRight);
 	static int s_ShowUserId = 0;
 	if(DoButton_CheckBox(&s_ShowUserId, Localize("Show user IDs"), g_Config.m_ClShowUserId, &Button))
 		g_Config.m_ClShowUserId ^= 1;
+
+	GameRight.HSplitTop(Spacing, 0, &GameRight);
+	GameRight.HSplitTop(ButtonHeight, &Button, &GameRight);
+	static int s_Showsocial = 0;
+	if(DoButton_CheckBox(&s_Showsocial, Localize("Show social"), g_Config.m_ClShowsocial, &Button))
+		g_Config.m_ClShowsocial ^= 1;
 
 	// show chat messages button
 	if(g_Config.m_ClShowsocial)
@@ -1021,11 +1023,11 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 
 		Button.VSplitLeft(119.0f, &Button, 0);
 		if(g_Config.m_ClFilterchat == 0)
-			str_format(aBuf, sizeof(aBuf), Localize("everyone"));
+			str_format(aBuf, sizeof(aBuf), Localize("everyone", "Show chat messages from:"));
 		else if(g_Config.m_ClFilterchat == 1)
-			str_format(aBuf, sizeof(aBuf), Localize("friends only"));
+			str_format(aBuf, sizeof(aBuf), Localize("friends only", "Show chat messages from:"));
 		else if(g_Config.m_ClFilterchat == 2)
-			str_format(aBuf, sizeof(aBuf), Localize("no one"));
+			str_format(aBuf, sizeof(aBuf), Localize("no one", "Show chat messages from:"));
 		static CButtonContainer s_ButtonFilterchat;
 		if(DoButton_Menu(&s_ButtonFilterchat, aBuf, 0, &Button))
 			g_Config.m_ClFilterchat = (g_Config.m_ClFilterchat + 1) % 3;
@@ -1202,9 +1204,7 @@ void CMenus::RenderSettingsPlayer(CUIRect MainView)
 
 	const int NewSelected = UiDoListboxEnd(&s_ListBoxState, 0);
 	if(OldSelected != NewSelected)
-	{
-		g_Config.m_PlayerCountry = m_pClient->m_pCountryFlags->GetByIndex(NewSelected)->m_CountryCode;
-	}
+		g_Config.m_PlayerCountry = m_pClient->m_pCountryFlags->GetByIndex(NewSelected, true)->m_CountryCode;
 }
 
 void CMenus::RenderSettingsTeeBasic(CUIRect MainView)
