@@ -65,6 +65,7 @@ public:
 	};
 	virtual void SetRconCID(int ClientID) = 0;
 	virtual bool IsAuthed(int ClientID) const = 0;
+	virtual bool IsBot(int ClientID) const = 0;
 	virtual bool IsBanned(int ClientID) const = 0;
 	virtual void Kick(int ClientID, const char *pReason) = 0;
 
