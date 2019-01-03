@@ -51,6 +51,8 @@ CMenus::CMenus()
 
 	m_NeedRestartGraphics = false;
 	m_NeedRestartSound = false;
+	m_NeedRestartPlayer = false;
+	m_NeedRestartTee = false;
 	m_TeePartSelected = SKINPART_BODY;
 	m_aSaveSkinName[0] = 0;
 	m_RefreshSkinSelector = true;
@@ -105,6 +107,18 @@ int CMenus::DoIcon(int ImageId, int SpriteId, const CUIRect *pRect)
 	Graphics()->QuadsEnd();
 
 	return 0;
+}
+
+void CMenus::DoIconColor(int ImageId, int SpriteId, const CUIRect* pRect, const vec4& Color)
+{
+	Graphics()->TextureSet(g_pData->m_aImages[ImageId].m_Id);
+
+	Graphics()->QuadsBegin();
+	RenderTools()->SelectSprite(SpriteId);
+	Graphics()->SetColor(Color.r*Color.a, Color.g*Color.a, Color.b*Color.a, Color.a);
+	IGraphics::CQuadItem QuadItem(pRect->x, pRect->y, pRect->w, pRect->h);
+	Graphics()->QuadsDrawTL(&QuadItem, 1);
+	Graphics()->QuadsEnd();
 }
 
 int CMenus::DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, bool Active)
@@ -955,13 +969,18 @@ CMenus::CListboxItem CMenus::UiDoListboxNextItem(CListBoxState* pState, const vo
 	}
 
 	CListboxItem Item = UiDoListboxNextRow(pState);
+	static bool s_ItemClicked = false;
 
 	if(Item.m_Visible && UI()->DoButtonLogic(pId, "", pState->m_ListBoxSelectedIndex == pState->m_ListBoxItemIndex, &Item.m_HitRect))
 	{
+		s_ItemClicked = true;
 		pState->m_ListBoxNewSelected = ThisItemIndex;
 		if(pActive)
 			*pActive = true;
 	}
+	else
+		s_ItemClicked = false;
+
 	const bool ProcessInput = !pActive || *pActive;
 
 	// process input, regard selected index
@@ -971,7 +990,7 @@ CMenus::CListboxItem CMenus::UiDoListboxNextItem(CListBoxState* pState, const vo
 		{
 			pState->m_ListBoxDoneEvents = 1;
 
-			if(m_EnterPressed || (UI()->CheckActiveItem(pId) && Input()->MouseDoubleClick()))
+			if(m_EnterPressed || (s_ItemClicked && Input()->MouseDoubleClick()))
 			{
 				pState->m_ListBoxItemActivated = true;
 				UI()->SetActiveItem(0);
@@ -1167,10 +1186,6 @@ void CMenus::RenderMenubar(CUIRect Rect)
 
 	if((Client()->State() == IClient::STATE_OFFLINE && m_MenuPage == PAGE_SETTINGS) || (Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_SETTINGS))
 	{
-		if(Client()->State() == IClient::STATE_ONLINE && (g_Config.m_UiSettingsPage == SETTINGS_PLAYER || g_Config.m_UiSettingsPage == SETTINGS_TEE))
-		{
-			g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
-		}
 		float Spacing = 3.0f;
 		float ButtonWidth = (Box.w/6.0f)-(Spacing*5.0)/6.0f;
 		float NotActiveAlpha = Client()->State() == IClient::STATE_ONLINE ? 0.5f : 1.0f;
@@ -1193,10 +1208,10 @@ void CMenus::RenderMenubar(CUIRect Rect)
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
-		if(Client()->State() == IClient::STATE_OFFLINE)
 		{
 			static CButtonContainer s_PlayerButton;
-			if(DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), g_Config.m_UiSettingsPage == SETTINGS_PLAYER, &Button))
+			if(DoButton_MenuTabTop(&s_PlayerButton, Localize("Player"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage == SETTINGS_PLAYER, &Button,
+				g_Config.m_UiSettingsPage == SETTINGS_PLAYER ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 			{
 				m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_PLAYER);
 				g_Config.m_UiSettingsPage = SETTINGS_PLAYER;
@@ -1205,15 +1220,16 @@ void CMenus::RenderMenubar(CUIRect Rect)
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
-		if(Client()->State() == IClient::STATE_OFFLINE)
 		{
 			static CButtonContainer s_TeeButton;
-			if(DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), g_Config.m_UiSettingsPage == SETTINGS_TEE, &Button))
+			if(DoButton_MenuTabTop(&s_TeeButton, Localize("Tee"), Client()->State() == IClient::STATE_OFFLINE && g_Config.m_UiSettingsPage == SETTINGS_TEE, &Button,
+				g_Config.m_UiSettingsPage == SETTINGS_TEE ? 1.0f : NotActiveAlpha, 1.0f, Corners))
 			{
 				m_pClient->m_pCamera->ChangePosition(CCamera::POS_SETTINGS_TEE);
 				g_Config.m_UiSettingsPage = SETTINGS_TEE;
 			}
 		}
+
 
 		Box.VSplitLeft(Spacing, 0, &Box); // little space
 		Box.VSplitLeft(ButtonWidth, &Button, &Box);
@@ -1775,6 +1791,7 @@ int CMenus::Render()
 			pTitle = Localize("Disconnected");
 			pExtraText = Client()->ErrorString();
 			pButtonText = Localize("Ok");
+			ExtraAlign = CUI::ALIGN_LEFT;
 		}
 		else if(m_Popup == POPUP_PURE)
 		{
@@ -1787,17 +1804,26 @@ int CMenus::Render()
 		{
 			pTitle = Localize("Delete demo");
 			pExtraText = Localize("Are you sure that you want to delete the demo?");
+			ExtraAlign = CUI::ALIGN_LEFT;
 		}
 		else if(m_Popup == POPUP_RENAME_DEMO)
 		{
 			pTitle = Localize("Rename demo");
 			pExtraText = Localize("Are you sure you want to rename the demo?");
 			NumOptions = 6;
+			ExtraAlign = CUI::ALIGN_LEFT;
 		}
 		else if(m_Popup == POPUP_REMOVE_FRIEND)
 		{
 			pTitle = Localize("Remove friend");
 			pExtraText = Localize("Are you sure that you want to remove the player from your friends list?");
+			ExtraAlign = CUI::ALIGN_LEFT;
+		}
+		else if(m_Popup == POPUP_REMOVE_FILTER)
+		{
+			pTitle = Localize("Remove filter");
+			pExtraText = Localize("Are you sure that you want to remove the filter from the server browser?");
+			ExtraAlign = CUI::ALIGN_LEFT;
 		}
 		else if(m_Popup == POPUP_SAVE_SKIN)
 		{
@@ -1810,6 +1836,7 @@ int CMenus::Render()
 		{
 			pTitle = Localize("Delete skin");
 			pExtraText = Localize("Are you sure that you want to delete the skin?");
+			ExtraAlign = CUI::ALIGN_LEFT;
 		}
 		else if(m_Popup == POPUP_SOUNDERROR)
 		{
@@ -2154,7 +2181,8 @@ int CMenus::Render()
 		{
 			CUIRect Yes, No;
 			Box.HSplitTop(27.0f, 0, &Box);
-			UI()->DoLabel(&Box, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign);
+			Box.VMargin(5.0f, &Box);
+			UI()->DoLabel(&Box, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign, Box.w);
 
 			// buttons
 			BottomBar.VSplitMid(&No, &Yes);
@@ -2172,10 +2200,37 @@ int CMenus::Render()
 				// remove friend
 				if(m_pDeleteFriend)
 				{
-					m_pClient->Friends()->RemoveFriend(m_pDeleteFriend->m_aName, m_pDeleteFriend->m_aClan);
+					m_pClient->Friends()->RemoveFriend(m_pDeleteFriend->m_FriendState == IFriends::FRIEND_PLAYER ? m_pDeleteFriend->m_aName : "", m_pDeleteFriend->m_aClan);
 					FriendlistOnUpdate();
 					Client()->ServerBrowserUpdate();
 					m_pDeleteFriend = 0;
+				}
+			}
+		}
+		else if(m_Popup == POPUP_REMOVE_FILTER)
+		{
+			CUIRect Yes, No;
+			Box.HSplitTop(27.0f, 0, &Box);
+			Box.VMargin(5.0f, &Box);
+			UI()->DoLabel(&Box, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign, Box.w);
+
+			// buttons
+			BottomBar.VSplitMid(&No, &Yes);
+			No.VSplitRight(SpacingW / 2.0f, &No, 0);
+			Yes.VSplitLeft(SpacingW / 2.0f, 0, &Yes);
+
+			static CButtonContainer s_ButtonNo;
+			if(DoButton_Menu(&s_ButtonNo, Localize("No"), 0, &No) || m_EscapePressed)
+				m_Popup = POPUP_NONE;
+
+			static CButtonContainer s_ButtonYes;
+			if(DoButton_Menu(&s_ButtonYes, Localize("Yes"), 0, &Yes) || m_EnterPressed)
+			{
+				m_Popup = POPUP_NONE;
+				// remove filter
+				if(m_RemoveFilterIndex)
+				{
+					RemoveFilter(m_RemoveFilterIndex);
 				}
 			}
 		}
@@ -2276,8 +2331,8 @@ int CMenus::Render()
 		else
 		{
 			Box.HSplitTop(27.0f, 0, &Box);
-			Box.VMargin(10.0f, &Part);
-			UI()->DoLabel(&Part, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign, -1);
+			Box.VMargin(5.0f, &Part);
+			UI()->DoLabel(&Part, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign, ExtraAlign == CUI::ALIGN_CENTER ? -1 : Part.w);
 
 			// button
 			static CButtonContainer s_Button;
