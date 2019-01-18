@@ -10,7 +10,7 @@ class CGameControllerCTF : public IGameController
 	// balancing
 	virtual bool CanBeMovedOnBalance(int ClientID) const;
 
-	virtual void DoWincheckMatch();
+	virtual bool DoWincheckMatch();
 
 public:
 	CGameControllerCTF(class CGameContext *pGameServer);
