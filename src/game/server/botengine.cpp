@@ -670,7 +670,7 @@ void CBotEngine::GenerateCorners()
 	}
 }
 
-void CBotEngine::GenerateTriangles()
+void CBotEngine::GenerateCorners()
 {
 	int CornerCount = 0;
 	for(int i = 1;i < m_Width - 1; i++)
@@ -691,8 +691,8 @@ void CBotEngine::GenerateTriangles()
 		}
 	}
 	dbg_msg("botengine","Found %d corners", CornerCount);
-	m_Triangulation.m_pTriangles = (CTriangulation::CTriangleData*)mem_alloc(2*CornerCount*sizeof(CTriangulation::CTriangleData),1);
-	vec2 *Corners = (vec2*)mem_alloc((CornerCount+3)*sizeof(vec2),1);
+	m_pCorners = (vec2*)mem_alloc((CornerCount+3)*sizeof(vec2),1);
+	m_CornerCount = CornerCount;
 	int m = 0;
 	for(int i = 1;i < m_Width - 1; i++)
 	{
@@ -708,42 +708,33 @@ void CBotEngine::GenerateTriangles()
 					n += g_PowerTwo[k];
 			}
 			if(g_IsInnerCorner[n] || g_IsOuterCorner[n])
-				Corners[m++] = vec2(i, j);
+				m_pCorners[m++] = vec2(i, j);
 		}
 	}
-	vec2 BL = Corners[0], TR = Corners[0];
-	for(int i = 1; i < CornerCount ; i++)
-	{
-		vec2 c = Corners[i];
-		if(c.x < BL.x) BL.x = c.x;
-		if(c.y < BL.y) BL.y = c.y;
-		if(c.x > TR.x) TR.x = c.x;
-		if(c.y > TR.y) TR.y = c.y;
-	}
-	Corners[CornerCount] = BL;
-	Corners[CornerCount+1].x = 2*TR.x-BL.x;
-	Corners[CornerCount+1].y = BL.y;
-	Corners[CornerCount+2].x = BL.x;
-	Corners[CornerCount+2].y = 2*TR.y-BL.y;
+}
+
+void CBotEngine::GenerateTriangles()
+{
+	m_Triangulation.m_CornerCount = m_CornerCount;
+	m_Triangulation.m_pTriangles = (CTriangulation::CTriangleData*)mem_alloc(2*m_CornerCount*sizeof(CTriangulation::CTriangleData),1);
 
 	m_Triangulation.m_Size = 0;
-	// CTriangle triangle(Corners[CornerCount], Corners[CornerCount+1], Corners[CornerCount+2]);
-	// m_Triangulation.m_pTriangles[m_Triangulation.m_Size++].m_Triangle = triangle;
-	for (int i = 0; i < CornerCount - 2; i++)
+
+	for (int i = 0; i < m_CornerCount - 2; i++)
 	{
-		for (int j = i + 1; j < CornerCount - 1; j++)
+		for (int j = i + 1; j < m_CornerCount - 1; j++)
 		{
-			if(FastIntersectLine(Corners[i].x+Corners[i].y*m_Width,Corners[j].x+Corners[j].y*m_Width))
+			if(FastIntersectLine(m_pCorners[i].x+m_pCorners[i].y*m_Width,m_pCorners[j].x+m_pCorners[j].y*m_Width))
 				continue;
-			for (int k = j + 1; k < CornerCount; k++)
+			for (int k = j + 1; k < m_CornerCount; k++)
 			{
-				if(FastIntersectLine(Corners[i].x+Corners[i].y*m_Width,Corners[k].x+Corners[k].y*m_Width) || FastIntersectLine(Corners[j].x+Corners[j].y*m_Width,Corners[k].x+Corners[k].y*m_Width))
+				if(FastIntersectLine(m_pCorners[i].x+m_pCorners[i].y*m_Width,m_pCorners[k].x+m_pCorners[k].y*m_Width) || FastIntersectLine(m_pCorners[j].x+m_pCorners[j].y*m_Width,m_pCorners[k].x+m_pCorners[k].y*m_Width))
 					continue;
-				CTriangle triangle(Corners[i], Corners[j], Corners[k]);
+				CTriangle triangle(m_pCorners[i], m_pCorners[j], m_pCorners[k]);
 				if(triangle.IsFlat())
 					continue;
 				vec2 cc = triangle.OuterCircleCenter();
-				float radius = distance(Corners[i], cc);
+				float radius = distance(m_pCorners[i], cc);
 
 				bool found = false;
 				for(int w = 0 ; w < m_Triangulation.m_Size; w++)
@@ -756,11 +747,11 @@ void CBotEngine::GenerateTriangles()
 				}
 				if (found)
 					continue;
-				for (int w = 0; w < CornerCount; w++)
+				for (int w = 0; w < m_CornerCount; w++)
 				{
 					if (w == i || w == j || w == k)
 						continue;
-					if (distance(cc, Corners[w]) < radius)
+					if (distance(cc, m_pCorners[w]) < radius)
 					{
 						found = true;
 						break;
@@ -769,9 +760,6 @@ void CBotEngine::GenerateTriangles()
 				if (found)
 					continue;
 
-				// vec2 a = triangle.CenterA();
-				// vec2 b = triangle.CenterB();
-				// vec2 c = triangle.CenterC();
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_Triangle = triangle;
 
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[0] = GameServer()->Server()->SnapNewID();
@@ -781,17 +769,17 @@ void CBotEngine::GenerateTriangles()
 			}
 		}
 	}
-	for (int i = 0; i < CornerCount - 2; i++)
+	for (int i = 0; i < m_CornerCount - 2; i++)
 	{
-		for (int j = i + 1; j < CornerCount - 1; j++)
+		for (int j = i + 1; j < m_CornerCount - 1; j++)
 		{
-			if(FastIntersectLine(Corners[i].x+Corners[i].y*m_Width,Corners[j].x+Corners[j].y*m_Width))
+			if(FastIntersectLine(m_pCorners[i].x+m_pCorners[i].y*m_Width,m_pCorners[j].x+m_pCorners[j].y*m_Width))
 				continue;
-			for (int k = j + 1; k < CornerCount; k++)
+			for (int k = j + 1; k < m_CornerCount; k++)
 			{
-				if(FastIntersectLine(Corners[i].x+Corners[i].y*m_Width,Corners[k].x+Corners[k].y*m_Width) || FastIntersectLine(Corners[j].x+Corners[j].y*m_Width,Corners[k].x+Corners[k].y*m_Width))
+				if(FastIntersectLine(m_pCorners[i].x+m_pCorners[i].y*m_Width,m_pCorners[k].x+m_pCorners[k].y*m_Width) || FastIntersectLine(m_pCorners[j].x+m_pCorners[j].y*m_Width,m_pCorners[k].x+m_pCorners[k].y*m_Width))
 					continue;
-				CTriangle triangle(Corners[i], Corners[j], Corners[k]);
+				CTriangle triangle(m_pCorners[i], m_pCorners[j], m_pCorners[k]);
 				if(triangle.IsFlat())
 					continue;
 
@@ -806,11 +794,11 @@ void CBotEngine::GenerateTriangles()
 				}
 				if (found)
 					continue;
-				for (int w = 0; w < CornerCount; w++)
+				for (int w = 0; w < m_CornerCount; w++)
 				{
 					if (w == i || w == j || w == k)
 						continue;
-					if (triangle.Inside(Corners[w]))
+					if (triangle.InsideOrSide(m_pCorners[w]))
 					{
 						found = true;
 						break;
@@ -819,9 +807,6 @@ void CBotEngine::GenerateTriangles()
 				if (found)
 					continue;
 
-				// vec2 a = triangle.CenterA();
-				// vec2 b = triangle.CenterB();
-				// vec2 c = triangle.CenterC();
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_Triangle = triangle;
 
 				m_Triangulation.m_pTriangles[m_Triangulation.m_Size].m_aSnapID[0] = GameServer()->Server()->SnapNewID();
