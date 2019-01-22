@@ -214,7 +214,6 @@ CBotEngine::CBotEngine(CGameContext *pGameServer)
 	m_Triangulation.m_Size = 0;
 	m_pCorners = 0;
 	m_CornerCount = 0;
-	m_pSegments = 0;
 	m_SegmentCount = 0;
 	mem_zero(m_aPaths,sizeof(m_aPaths));
 	mem_zero(m_apBot,sizeof(m_apBot));
@@ -238,15 +237,8 @@ void CBotEngine::Free()
 	m_CornerCount = 0;
 	m_pCorners = 0;
 
-	for(int k = 0; k < m_SegmentCount; k++)
-	{
-		CSegment *pSegment = m_pSegments + k;
-		GameServer()->Server()->SnapFreeID(pSegment->m_SnapID);
-	}
-	if(m_pSegments)
-		mem_free(m_pSegments);
+	m_lSegments.clear();
 	m_SegmentCount = 0;
-	m_pSegments = 0;
 
 	for(int k = 0; k < m_Graph.NumEdges(); k++)
 		GameServer()->Server()->SnapFreeID(m_Graph.GetEdgeData(k));
@@ -397,203 +389,64 @@ void CBotEngine::GenerateSegments()
 	int VSegmentCount = 0;
 	int HSegmentCount = 0;
 	// Vertical segments
-	for(int i = 1;i < m_Width-1; i++)
+	for(int i = 0; i < m_Width; i++)
 	{
-		bool right = false;
-		bool left = false;
+		bool started = false;
+		int last = 0;
 		for(int j = 0; j < m_Height; j++)
 		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
-				left = true;
-			else if(left)
+			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+				started = false;
+			else if(IsCorner(i,j))
 			{
-				VSegmentCount++;
-				left = false;
+				if(started)
+				{
+					CSegment Segment = {
+						.m_IsVertical = true,
+						.m_A = vec2(i,last),
+						.m_B = vec2(i,j)
+					};
+					m_lSegments.add(Segment);
+					VSegmentCount++;
+				}
+				else
+					started = true;
+				last = j;
 			}
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i-1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
-				right = true;
-			else if(right)
-			{
-				VSegmentCount++;
-				right = false;
-			}
+			else if(!IsOnEdge(i,j))
+				started = false;
 		}
-		if(left)
-			VSegmentCount++;
-		if(right)
-			VSegmentCount++;
 	}
 	// Horizontal segments
-	for(int j = 1; j < m_Height-1; j++)
+	for(int j = 0; j < m_Height; j++)
 	{
-		bool up = false;
-		bool down = false;
+		bool started = false;
+		int last = 0;
 		for(int i = 0; i < m_Width; i++)
 		{
-			if(up && ((m_pGrid[i+j*m_Width] & GTILE_MASK) <= GTILE_AIR || (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) > GTILE_AIR))
+			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+				started = false;
+			else if(IsCorner(i,j))
 			{
-				HSegmentCount++;
-				up = false;
+				if(started)
+				{
+					CSegment Segment = {
+						.m_IsVertical = false,
+						.m_A = vec2(last,j),
+						.m_B = vec2(i,j)
+					};
+					m_lSegments.add(Segment);
+					HSegmentCount++;
+				}
+				else
+					started = true;
+				last = i;
 			}
-			if(down && ((m_pGrid[i+j*m_Width] & GTILE_MASK) <= GTILE_AIR || (m_pGrid[i+(j-1)*m_Width] & GTILE_MASK) > GTILE_AIR))
-			{
-				HSegmentCount++;
-				down = false;
-			}
-
-			if(!up && (m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
-				up = true;
-			if(!down && (m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j-1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
-				down = true;
+			else if(!IsOnEdge(i,j))
+				started = false;
 		}
-		if(up)
-			HSegmentCount++;
-		if(down)
-			HSegmentCount++;
 	}
 	dbg_msg("botengine","Found %d vertical segments, and %d horizontal segments", VSegmentCount, HSegmentCount);
-	m_SegmentCount = HSegmentCount+VSegmentCount;
-	m_HSegmentCount = HSegmentCount;
-	m_pSegments = (CSegment*) mem_alloc(m_SegmentCount*sizeof(CSegment),1);
-	CSegment* pSegment = m_pSegments;
-	// Horizontal segments
-	for(int j = 1; j < m_Height-1; j++)
-	{
-		bool up = false;
-		bool down = false;
-		int up_i = 1, down_i = 1;
-		for(int i = 0; i < m_Width; i++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j+1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
-			{
-				if(!up)
-					up_i = i;
-				up = true;
-			}
-			else if(up)
-			{
-				pSegment->m_IsVertical = false;
-				if(!up_i)
-					up_i = -200;
-				pSegment->m_A = vec2(up_i*32,(j+1)*32);
-				pSegment->m_B = vec2(i*32,(j+1)*32);
-				pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-				pSegment++;
-				up = false;
-			}
-
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+(j-1)*m_Width] & GTILE_MASK) <= GTILE_AIR)
-			{
-				if(!down)
-					down_i = i;
-				down = true;
-			}
-			else if(down)
-			{
-				pSegment->m_IsVertical = false;
-				if(!down_i)
-					down_i = -200;
-				pSegment->m_A = vec2(down_i*32,j*32);
-				pSegment->m_B = vec2(i*32,j*32);
-				pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-				pSegment++;
-				down = false;
-			}
-		}
-		if(up)
-		{
-			pSegment->m_IsVertical = false;
-			if(!up_i)
-				up_i = -200;
-			pSegment->m_A = vec2(up_i*32,(j+1)*32);
-			pSegment->m_B = vec2((m_Width+200)*32,(j+1)*32);
-			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-			pSegment++;
-			up = false;
-		}
-		if(down)
-		{
-			pSegment->m_IsVertical = false;
-			if(!down_i)
-				down_i = -200;
-			pSegment->m_A = vec2(down_i*32,j*32);
-			pSegment->m_B = vec2((m_Width+200)*32,j*32);
-			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-			pSegment++;
-			down = false;
-		}
-	}
-	// Vertical segments
-	for(int i = 1;i < m_Width-1; i++)
-	{
-		bool right = false;
-		bool left = false;
-		int right_j = 1, left_j = 1;
-		for(int j = 0; j < m_Height; j++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i+1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
-			{
-				if(!left)
-					left_j = j;
-				left = true;
-			}
-			else if(left)
-			{
-				pSegment->m_IsVertical = true;
-				if(!left_j)
-					left_j = -200;
-				pSegment->m_A = vec2((i+1)*32,left_j*32);
-				pSegment->m_B = vec2((i+1)*32,j*32);
-				pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-				pSegment++;
-				left = false;
-			}
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR && (m_pGrid[i-1+j*m_Width] & GTILE_MASK) <= GTILE_AIR)
-			{
-				if(!right)
-					right_j = j;
-				right = true;
-			}
-			else if(right)
-			{
-				pSegment->m_IsVertical = true;
-				if(!right_j)
-					right_j = -200;
-				pSegment->m_A = vec2(i*32,right_j*32);
-				pSegment->m_B = vec2(i*32,j*32);
-				pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-				pSegment++;
-				right = false;
-			}
-		}
-		if(left)
-		{
-			pSegment->m_IsVertical = true;
-			if(!left_j)
-				left_j = -200;
-			pSegment->m_A = vec2((i+1)*32,left_j*32);
-			pSegment->m_B = vec2((i+1)*32,(m_Height+200)*32);
-			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-			pSegment++;
-			left = false;
-		}
-		if(right)
-		{
-			pSegment->m_IsVertical = true;
-			if(!right_j)
-				right_j = -200;
-			pSegment->m_A = vec2(i*32,right_j*32);
-			pSegment->m_B = vec2(i*32,(m_Height+200)*32);
-			pSegment->m_SnapID = GameServer()->Server()->SnapNewID();
-			pSegment++;
-			right = false;
-		}
-	}
-	dbg_msg("botengine","Allocate %d segments, use %d", m_SegmentCount, pSegment - m_pSegments);
-	if(m_SegmentCount != pSegment - m_pSegments)
-		exit(1);
-	qsort(m_pSegments,HSegmentCount,sizeof(CSegment),SegmentComp);
-	qsort(m_pSegments+HSegmentCount,VSegmentCount,sizeof(CSegment),SegmentComp);
 }
 
 int CBotEngine::SegmentComp(const void *a, const void *b)
@@ -627,47 +480,36 @@ int CBotEngine::SegmentComp(const void *a, const void *b)
 	return 0;
 }
 
-void CBotEngine::GenerateCorners()
+bool CBotEngine::IsCorner(int i, int j)
 {
-	int CornerCount = 0;
-	for(int i = 1;i < m_Width - 1; i++)
+	if( i < 0 || i >= m_Width || j < 0 || j >= m_Height)
+		return false;
+	if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+		return false;
+	int n = 0;
+	for(int k = 0; k < 8; k++)
 	{
-		for(int j = 1; j < m_Height - 1; j++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
-				continue;
-			int n = 0;
-			for(int k = 0; k < 8; k++)
-			{
-				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
-				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
-					n += g_PowerTwo[k];
-			}
-			if(g_IsOuterCorner[n])
-				CornerCount++;
-		}
+		int Index = clamp(i+g_Neighboors[k][0], 0, m_Width-1)+clamp(j+g_Neighboors[k][1], 0, m_Height-1)*m_Width;
+		if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
+			n += g_PowerTwo[k];
 	}
-	dbg_msg("botengine","Found %d outer corners", CornerCount);
-	m_pCorners = (vec2*)mem_alloc(CornerCount*sizeof(vec2),1);
-	m_CornerCount = CornerCount;
-	int m = 0;
-	for(int i = 1;i < m_Width - 1; i++)
+	return g_IsInnerCorner[n] || g_IsOuterCorner[n];
+}
+
+bool CBotEngine::IsOnEdge(int i, int j)
+{
+	if( i < 0 || i >= m_Width || j < 0 || j >= m_Height)
+		return false;
+	if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
+		return false;
+	int n = 0;
+	for(int k = 0; k < 8; k++)
 	{
-		for(int j = 1; j < m_Height - 1; j++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
-				continue;
-			int n = 0;
-			for(int k = 0; k < 8; k++)
-			{
-				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
-				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
-					n += g_PowerTwo[k];
-			}
-			if(g_IsOuterCorner[n])
-				m_pCorners[m++] = ConvertIndex(i+j*m_Width);
-		}
+		int Index = clamp(i+g_Neighboors[k][0], 0, m_Width-1)+clamp(j+g_Neighboors[k][1], 0, m_Height-1)*m_Width;
+		if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
+			n += g_PowerTwo[k];
 	}
+	return g_IsOnEdge[n];
 }
 
 void CBotEngine::GenerateCorners()
@@ -860,6 +702,14 @@ void CBotEngine::GenerateGraphFromTriangles()
 				m_Graph.SetEdgeData(k, GameServer()->Server()->SnapNewID());
 		}
 	}
+	for (int i = 0; i < m_lSegments.size(); i++)
+	{
+		const CSegment & Segment = m_lSegments[i];
+		int k = m_Graph.AddEdge(Segment.m_A*32 + vec2(16,16), Segment.m_B*32 + vec2(16,16));
+		if(k >= 0)
+			m_Graph.SetEdgeData(k, GameServer()->Server()->SnapNewID());
+	}
+	dbg_msg("botengine","Graph with %d vertices and %d edges", m_Graph.NumVertices(), m_Graph.NumEdges());
 	m_Graph.ComputeClosestPath();
 }
 
