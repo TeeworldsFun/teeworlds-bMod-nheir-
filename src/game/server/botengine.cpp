@@ -516,43 +516,18 @@ void CBotEngine::GenerateCorners()
 {
 	int CornerCount = 0;
 	for(int i = 1;i < m_Width - 1; i++)
-	{
 		for(int j = 1; j < m_Height - 1; j++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
-				continue;
-			int n = 0;
-			for(int k = 0; k < 8; k++)
-			{
-				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
-				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
-					n += g_PowerTwo[k];
-			}
-			if(g_IsInnerCorner[n] || g_IsOuterCorner[n])
+			if(IsCorner(i,j))
 				CornerCount++;
-		}
-	}
+
 	dbg_msg("botengine","Found %d corners", CornerCount);
 	m_pCorners = (vec2*)mem_alloc((CornerCount+3)*sizeof(vec2),1);
 	m_CornerCount = CornerCount;
 	int m = 0;
 	for(int i = 1;i < m_Width - 1; i++)
-	{
 		for(int j = 1; j < m_Height - 1; j++)
-		{
-			if((m_pGrid[i+j*m_Width] & GTILE_MASK) > GTILE_AIR)
-				continue;
-			int n = 0;
-			for(int k = 0; k < 8; k++)
-			{
-				int Index = i+g_Neighboors[k][0]+(j+g_Neighboors[k][1])*m_Width;
-				if((m_pGrid[Index] & GTILE_MASK) > GTILE_AIR)
-					n += g_PowerTwo[k];
-			}
-			if(g_IsInnerCorner[n] || g_IsOuterCorner[n])
+			if(IsCorner(i,j))
 				m_pCorners[m++] = vec2(i, j);
-		}
-	}
 }
 
 void CBotEngine::GenerateTriangles()
@@ -665,7 +640,6 @@ void CBotEngine::GenerateGraphFromTriangles()
 {
 	for (int i = 0; i < m_Triangulation.m_Size; i++)
 		m_Graph.AddVertex(m_Triangulation.m_pTriangles[i].m_Triangle.Centroid()*32 + vec2(16,16));
-	int side[] = {0,0,2,1};
 	for (int i = 0; i < m_Triangulation.m_Size; i++)
 	{
 		for (int j = 0; j < m_Triangulation.m_Size; j++)
