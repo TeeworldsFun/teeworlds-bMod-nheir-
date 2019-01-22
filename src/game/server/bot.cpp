@@ -42,21 +42,15 @@ void CBot::OnReset()
 	m_Flags = 0;
 	m_pPath->m_Size = 0;
 	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
-	//m_Genetics.SetFitness(m_GenomeTick);
-	//m_Genetics.NextGenome();
-	//m_GenomeTick = 0;
-	//UpdateTargetOrder();
-	//dbg_msg("bot", "new target order %d %d %d %d %d %d %d %d", m_aTargetOrder[0], m_aTargetOrder[1], m_aTargetOrder[2], m_aTargetOrder[3], m_aTargetOrder[4], m_aTargetOrder[5], m_aTargetOrder[6], m_aTargetOrder[7]);
 }
 
 void CBot::UpdateTargetOrder()
 {
-	//int *pGenome = m_Genetics.GetGenome();
-	const int *pGenome = &g_aBotPriority[m_pPlayer->GetCID() % 16][0];
+	const int *pPriority = &g_aBotPriority[m_pPlayer->GetCID() % 16][0];
 	for(int i = 0 ; i < CTarget::NUM_TARGETS ; i++)
 	{
 		int j = i;
-		while(j > 0 && pGenome[i] > pGenome[m_aTargetOrder[j-1]])
+		while(j > 0 && pPriority[i] > pPriority[m_aTargetOrder[j-1]])
 		{
 			m_aTargetOrder[j] = m_aTargetOrder[j-1];
 			j--;
@@ -80,8 +74,7 @@ vec2 CBot::ClosestCharacter()
 
 void CBot::UpdateTarget()
 {
-	//m_GenomeTick++;
-	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;// || !m_pPath->m_Size;
+	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID] && GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
 
@@ -271,12 +264,8 @@ void CBot::Tick()
 	if(!m_pPlayer->GetCharacter())
 		return;
 	const CCharacterCore *pMe = m_pPlayer->GetCharacter()->GetCore();
-	// int Team = m_pPlayer->GetTeam();
 
 	UpdateTarget();
-
-	// if(m_ComputeTarget.m_NeedUpdate)
-	// 	dbg_msg("bot", "new target pos=(%f,%f) type=%d", m_ComputeTarget.m_Pos.x, m_ComputeTarget.m_Pos.y, m_ComputeTarget.m_Type);
 
 	UpdateEdge();
 
@@ -386,8 +375,6 @@ void CBot::HandleHook(bool SeeTarget)
 				m_InputData.m_Hook = 1;
 			if(pMe->m_HookTick > 4*SERVER_TICK_SPEED || length(pMe->m_HookPos-pMe->m_Pos) < 20.0f)
 				m_InputData.m_Hook = 0;
-			// if(Flags & BFLAG_HOOK && ps < dot(Target,HookVel-Accel))
-			// 	Flags ^= BFLAG_RIGHT | BFLAG_LEFT;
 		}
 		if(pMe->m_HookState == HOOK_FLYING)
 			m_InputData.m_Hook = 1;
@@ -446,7 +433,6 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 	int Team = m_pPlayer->GetTeam();
 	vec2 Pos = pMe->GetCore()->m_Pos;
-	// vec2 Vel = pMe->GetCore()->m_Vel;
 
 	CCharacterCore* apTarget[MAX_CLIENTS];
 	int Count = 0;
@@ -517,10 +503,8 @@ void CBot::HandleWeapon(bool SeeTarget)
 					Time = GameServer()->Tuning()->m_GunLifetime;
 					break;
 			}
-			//DTime /= NbLoops;
+
 			int DTick = (int) (Time * GameServer()->Server()->TickSpeed() / NbLoops);
-			// DTime *= Speed;
-			// Curvature *= 0.00001f;
 
 			for(int c = 0; c < Count; c++)
 			{
@@ -555,7 +539,6 @@ void CBot::HandleWeapon(bool SeeTarget)
 				}
 				for(int c = 0; c < Count; c++)
 				{
-					//Collision()->MoveBox(&aTargetPos[c], &aTargetVel[c], vec2(28.f,28.f), 0);
 					Collision()->FastIntersectLine(aTargetPos[c], aTargetPos[c]+aTargetVel[c], 0, &aTargetPos[c]);
 					aTargetVel[c].y += GameServer()->Tuning()->m_Gravity*DTick*DTick;
 				}
@@ -597,10 +580,8 @@ void CBot::UpdateEdge()
 	if(m_ComputeTarget.m_NeedUpdate)
 	{
 		m_pPath->m_Size = 0;
-		//m_pPath->m_Size = BotEngine()->GetPartialPath(Pos, m_ComputeTarget.m_Pos, m_pPath->m_pVertices, 10);
 		BotEngine()->GetPath(Pos, m_ComputeTarget.m_Pos, m_pPath);
 		m_ComputeTarget.m_NeedUpdate = false;
-		// dbg_msg("bot", "%d new path of size=%d for type=%d cid=%d", m_pPlayer->GetCID(), m_pPath->m_Size, m_ComputeTarget.m_Type, m_ComputeTarget.m_PlayerCID);
 	}
 }
 
@@ -670,8 +651,6 @@ void CBot::MakeChoice(bool UseTarget)
 			}
 			else
 				tried = false;
-			// if(m_Target.y < 0 && TempChar.m_Vel.y > 1.f && !(TempChar.m_Jumped) && !Grounded)
-			// 	Flags |= BFLAG_JUMP;
 		}
 
 		if(!(pMe->m_Jumped))
