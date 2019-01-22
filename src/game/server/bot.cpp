@@ -181,8 +181,8 @@ void CBot::UpdateTarget()
 			case CTarget::TARGET_AIR:
 				{
 					// Random destination
-					int r = random_int()%BotEngine()->GetGraph()->m_NumVertices;
-					m_ComputeTarget.m_Pos = BotEngine()->GetGraph()->m_pVertices[r].m_Pos;
+					int r = random_int()%BotEngine()->GetGraph()->NumVertices();
+					m_ComputeTarget.m_Pos = BotEngine()->GetGraph()->GetVertex(r);
 					m_ComputeTarget.m_Type = CTarget::TARGET_AIR;
 					return;
 				}

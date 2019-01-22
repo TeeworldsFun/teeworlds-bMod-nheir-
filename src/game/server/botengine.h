@@ -159,25 +159,46 @@ class CTriangle {
 		}
 };
 
-class CVertex {
-public:
-	vec2 m_Pos;
-	int m_Degree;
-};
 
-struct CEdge {
-	vec2 m_Start;
-	vec2 m_End;
-	int m_Size;
-	int m_SnapID;
-};
-
+// Planar graph
 class CGraph {
+
 public:
-	CEdge *m_pEdges;
-	int m_NumEdges;
-	CVertex *m_pVertices;
-	int m_NumVertices;
+	struct CEdge {
+		int m_Start;
+		int m_End;
+		double m_Length;
+		int m_Data;
+	};
+
+	CGraph();
+	~CGraph();
+	bool Reserve(int NumVertices, int NumEdges);
+	void Reset();
+	void Free();
+
+	int AddVertex(vec2 Pos);
+	vec2 GetVertex(int id) const;
+	int NumVertices()  const { return m_lVertices.size(); }
+
+	int AddEdge(vec2 Start, vec2 End);
+	int AddEdge(int StartId, int EndId);
+	CEdge GetEdge(int Id) const;
+	int NumEdges() const { return m_lEdges.size(); }
+
+	int GetEdgeData(int Id) const;
+	void SetEdgeData(int Id, int Data);
+
+	int Diameter() const { return m_Diameter; };
+
+	void ComputeClosestPath();
+
+	int GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices) const;
+	bool GetNextInPath(vec2 VStart, vec2 VEnd, vec2 *pNextVertex) const;
+
+protected:
+	array<vec2> m_lVertices;
+	array<CEdge> m_lEdges;
 
 	int *m_pClosestPath;
 
@@ -185,16 +206,7 @@ public:
 
 	int m_Width;
 
-	CGraph();
-	~CGraph();
-	void Reset();
-	void Free();
-
-	void ComputeClosestPath();
-
-	int GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices);
-
-	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
+	int GetVertex(vec2 Pos) const;
 };
 
 class CBotEngine

@@ -1,3 +1,4 @@
+#include <base/tl/algorithm.h>
 #include <game/gamecore.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
@@ -9,105 +10,199 @@
 
 CGraph::CGraph()
 {
-	m_NumVertices = 0;
-	m_NumEdges = 0;
-	m_pEdges = 0;
-	m_pVertices = 0;
 	m_pClosestPath = 0;
 	m_Diameter = 0;
 }
+
 CGraph::~CGraph()
 {
 	Free();
 }
+
 void CGraph::Reset()
 {
 	Free();
-	m_NumVertices = 0;
-	m_NumEdges = 0;
 	m_Diameter = 0;
 }
+
 void CGraph::Free()
 {
-	if(m_pEdges)
-		mem_free(m_pEdges);
-	if(m_pVertices)
-		mem_free(m_pVertices);
-	if(m_pClosestPath)
-		mem_free(m_pClosestPath);
-	m_pVertices = 0;
-	m_pEdges = 0;
+	m_lVertices.clear();
+	m_lEdges.clear();
 	m_pClosestPath = 0;
+}
+
+int CGraph::GetVertex(vec2 Pos) const
+{
+	array<vec2>::range r = ::find_linear(m_lVertices.all(), Pos);
+	if (r.empty())
+		return -1;
+	return m_lVertices.size() - r.size();
+}
+
+vec2 CGraph::GetVertex(int Id) const
+{
+	if(Id < 0 || Id >= m_lVertices.size())
+		return vec2(0,0);
+	return m_lVertices[Id];
+}
+
+int CGraph::AddVertex(vec2 Pos)
+{
+	int r = GetVertex(Pos);
+	if (r < 0)
+		return m_lVertices.add(Pos);
+	return r;
+}
+
+int CGraph::AddEdge(vec2 Start, vec2 End)
+{
+	return AddEdge(AddVertex(Start), AddVertex(End));
+}
+
+int CGraph::AddEdge(int StartId, int EndId)
+{
+	if (StartId < 0 || EndId < 0)
+		return -1;
+	if (StartId >= m_lVertices.size() || EndId >= m_lVertices.size())
+		return -1;
+	CEdge Edge = {
+		.m_Start = StartId,
+		.m_End = EndId,
+		.m_Length = distance(m_lVertices[StartId], m_lVertices[EndId])
+	};
+	return m_lEdges.add(Edge);
+}
+
+CGraph::CEdge CGraph::GetEdge(int Id) const
+{
+	if( Id < 0 || Id >= m_lEdges.size())
+		return {0};
+	return m_lEdges[Id];
+}
+
+int CGraph::GetEdgeData(int Id) const
+{
+	if( Id < 0 || Id >= m_lEdges.size())
+		return 0;
+	return m_lEdges[Id].m_Data;
+}
+
+void CGraph::SetEdgeData(int Id, int Data)
+{
+	if( Id < 0 || Id >= m_lEdges.size())
+		return;
+	m_lEdges[Id].m_Data = Data;
 }
 
 void CGraph::ComputeClosestPath()
 {
-	if(!m_pEdges || !m_pVertices)
-		return;
 	if(m_pClosestPath)
 		mem_free(m_pClosestPath);
-	m_pClosestPath = (int*)mem_alloc(m_NumVertices*m_NumVertices*sizeof(int),1);
+	int NumVertices = m_lVertices.size();
+	m_pClosestPath = (int*)mem_alloc(NumVertices*NumVertices*sizeof(int),1);
 	if(!m_pClosestPath)
 		return;
-	int* Dist = (int*)mem_alloc(m_NumVertices*m_NumVertices*sizeof(int),1);
-	if(!Dist)
+	int* Size = (int*)mem_alloc(NumVertices*NumVertices*sizeof(int),1);
+	if(!Size)
 		return;
-	for(int i = 0 ; i < m_NumVertices*m_NumVertices ; i++)
+	double* Dist = (double*)mem_alloc(NumVertices*NumVertices*sizeof(double),1);
+	if(!Dist)
 	{
-		m_pClosestPath[i] = -1;
-		Dist[i] = 1000000;
-	}
-	for(int i=0; i < m_NumVertices ; i++)
-		Dist[i*(1+m_NumVertices)] = 0;
-	for(int i=0; i < m_NumEdges ; i++)
-	{
-		int Start, End;
-		for(Start=0; Start < m_NumVertices && m_pVertices[Start].m_Pos != m_pEdges[i].m_Start; Start++);
-		for(End=0; End < m_NumVertices && m_pVertices[End].m_Pos != m_pEdges[i].m_End; End++);
-		if(m_pEdges[i].m_Size < Dist[Start + End * m_NumVertices])
-			Dist[Start + End * m_NumVertices] = m_pEdges[i].m_Size-1;
-		m_pClosestPath[Start + End * m_NumVertices] = End;
+		mem_free(Size);
+		return;
 	}
 
-	for(int k = 0; k < m_NumVertices ; k++)
+	double EdgeSizeMax = 0;
+	for(int i=0; i < m_lEdges.size() ; i++)
+		if(m_lEdges[i].m_Length > EdgeSizeMax)
+			EdgeSizeMax = m_lEdges[i].m_Length;
+
+	for(int i = 0 ; i < NumVertices*NumVertices ; i++)
 	{
-		for(int i = 0; i < m_NumVertices ; i++)
+		m_pClosestPath[i] = -1;
+		Dist[i] = NumVertices*EdgeSizeMax;
+		Size[i] = NumVertices;
+	}
+
+	for(int i=0; i < NumVertices ; i++)
+	{
+		m_pClosestPath[i*(1+NumVertices)] = i;
+		Dist[i*(1+NumVertices)] = 0.f;
+		Size[i*(1+NumVertices)] = 0;
+	}
+	for(int i=0; i < m_lEdges.size() ; i++)
+	{
+		int aPoints[2] = { m_lEdges[i].m_Start, m_lEdges[i].m_End };
+		for (int j=0; j < 2; j++)
 		{
-			for(int j = 0; j < m_NumVertices ; j++)
+			Dist[aPoints[j] + aPoints[1-j] * NumVertices] = m_lEdges[i].m_Length;
+			m_pClosestPath[aPoints[j] + aPoints[1-j] * NumVertices] = aPoints[1-j];
+			Size[aPoints[j] + aPoints[1-j] * NumVertices] = 1;
+		}
+	}
+
+	for(int k = 0; k < NumVertices ; k++)
+	{
+		for(int i = 0; i < NumVertices ; i++)
+		{
+			for(int j = 0; j < NumVertices ; j++)
 			{
-				if(Dist[i + k * m_NumVertices] + Dist[k + j * m_NumVertices] < Dist[i + j * m_NumVertices])
+				if(Dist[i + k * NumVertices] + Dist[k + j * NumVertices] < Dist[i + j * NumVertices])
 				{
-					Dist[i + j * m_NumVertices] = Dist[i + k * m_NumVertices] + Dist[k + j * m_NumVertices];
-					m_pClosestPath[i + j * m_NumVertices] = m_pClosestPath[i + k * m_NumVertices];
+					Dist[i + j * NumVertices] = Dist[i + k * NumVertices] + Dist[k + j * NumVertices];
+					Size[i + j * NumVertices] = Size[i + k * NumVertices] + Size[k + j * NumVertices];
+					m_pClosestPath[i + j * NumVertices] = m_pClosestPath[i + k * NumVertices];
 				}
 			}
 		}
 	}
 	m_Diameter = 1;
-	for(int i = 0 ; i < m_NumVertices*m_NumVertices ; i++)
-		if(Dist[i] < 1000000 && m_Diameter < Dist[i])
-			m_Diameter = Dist[i];
-	dbg_msg("botengine","closest path computed, diameter=%d",m_Diameter);
+	for(int i = 0 ; i < NumVertices*NumVertices ; i++)
+		if(m_pClosestPath[i] >= 0 && m_Diameter < Size[i])
+			m_Diameter = Size[i];
+	dbg_msg("botengine","closest path computed, diameter=%d", m_Diameter);
+	mem_free(Size);
 	mem_free(Dist);
 }
 
-int CGraph::GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices)
+int CGraph::GetPath(vec2 VStart, vec2 VEnd, vec2 *pVertices) const
 {
-	int Start, End;
-	for(Start=0; Start < m_NumVertices && m_pVertices[Start].m_Pos != VStart; Start++);
-	for(End=0; End < m_NumVertices && m_pVertices[End].m_Pos != VEnd; End++);
-	if(Start == m_NumVertices || End == m_NumVertices || m_pClosestPath[Start + End * m_NumVertices] < 0)
+	int Start = GetVertex(VStart);
+	int End = GetVertex(VEnd);
+	int NumVertices = m_lVertices.size();
+
+	if(Start < 0 || End < 0 || m_pClosestPath[Start + End * NumVertices] < 0)
 		return 0;
+
 	int Size = 0;
 	int Cur = Start;
 	while(Cur != End)
 	{
-		pVertices[Size++] = m_pVertices[Cur].m_Pos;
-		Cur = m_pClosestPath[Cur + End * m_NumVertices];
+		pVertices[Size++] = m_lVertices[Cur];
+		Cur = m_pClosestPath[Cur + End * NumVertices];
 	}
 	pVertices[Size++] = VEnd;
 
 	return Size;
+}
+
+bool CGraph::GetNextInPath(vec2 VStart, vec2 VEnd, vec2 *pNextVertex) const
+{
+	int Start = GetVertex(VStart);
+	int End = GetVertex(VEnd);
+	int NumVertices = m_lVertices.size();
+
+	if(Start < 0 || End < 0 || m_pClosestPath[Start + End * NumVertices] < 0)
+		return false;
+
+	if (Start == End)
+		return true;
+
+	if(!pNextVertex)
+		*pNextVertex = GetVertex(m_pClosestPath[Start + End * NumVertices]);
+
+	return true;
 }
 
 
@@ -153,11 +248,8 @@ void CBotEngine::Free()
 	m_SegmentCount = 0;
 	m_pSegments = 0;
 
-	for(int k = 0; k < m_Graph.m_NumEdges; k++)
-	{
-		CEdge *pEdge = m_Graph.m_pEdges + k;
-		GameServer()->Server()->SnapFreeID(pEdge->m_SnapID);
-	}
+	for(int k = 0; k < m_Graph.NumEdges(); k++)
+		GameServer()->Server()->SnapFreeID(m_Graph.GetEdgeData(k));
 	m_Graph.Free();
 
 	for(int c = 0; c < MAX_CLIENTS; c++)
@@ -290,7 +382,7 @@ void CBotEngine::Init(CTile *pTiles, int Width, int Height)
 
 		for(int c = 0; c < MAX_CLIENTS; c++)
 		{
-			m_aPaths[c].m_MaxSize = m_Graph.m_Diameter+3;
+			m_aPaths[c].m_MaxSize = m_Graph.Diameter()+3;
 			m_aPaths[c].m_pVertices = (vec2*) mem_alloc(m_aPaths[c].m_MaxSize*sizeof(vec2),1);
 			m_aPaths[c].m_pSnapID = (int*) mem_alloc(m_aPaths[c].m_MaxSize*sizeof(int),1);
 			for(int i = 0 ; i < m_aPaths[c].m_MaxSize; i++)
@@ -740,54 +832,47 @@ void CBotEngine::GenerateTriangles()
 		}
 	}
 	dbg_msg("botengine","Build %d triangles", m_Triangulation.m_Size);
-	mem_free(Corners);
 }
 
 void CBotEngine::GenerateGraphFromTriangles()
 {
-	m_Graph.m_NumEdges = 0;
-	for (int i = 0; i < m_Triangulation.m_Size - 1; i++)
+	for (int i = 0; i < m_Triangulation.m_Size; i++)
+		m_Graph.AddVertex(m_Triangulation.m_pTriangles[i].m_Triangle.Centroid()*32 + vec2(16,16));
+	int side[] = {0,0,2,1};
+	for (int i = 0; i < m_Triangulation.m_Size; i++)
 	{
-		for (int j = i + 1; j < m_Triangulation.m_Size; j++)
+		for (int j = 0; j < m_Triangulation.m_Size; j++)
 		{
-			int count = 0;
+			int count[] = {0,0,0};
 			for(int k = 0 ; k < 3; k++)
 				for(int l = 0; l < 3; l++)
 					if(m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[k] == m_Triangulation.m_pTriangles[j].m_Triangle.m_aPoints[l])
-						count++;
-			if(count == 2)
-				m_Graph.m_NumEdges+=2;
+						count[k] = 1;
+			if(count[0] + count[1] + count[2] == 2)
+			{
+				if(i < j)
+				{
+					int k = m_Graph.AddEdge(i,j);
+					if(k >= 0)
+						m_Graph.SetEdgeData(k, GameServer()->Server()->SnapNewID());
+					vec2 A = (count[0]) ? m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[0] : m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[1];
+					vec2 B = (count[2]) ? m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[2] : m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[1];
+					k = m_Graph.AddEdge(A*32 + vec2(16,16),B*32 + vec2(16,16));
+					if(k >= 0)
+						m_Graph.SetEdgeData(k, GameServer()->Server()->SnapNewID());
+				}
+			}
 		}
 	}
-	m_Graph.m_Width = m_Width;
-	m_Graph.m_NumVertices = m_Triangulation.m_Size;
-	m_Graph.m_pVertices = (CVertex*)mem_alloc(m_Graph.m_NumVertices*sizeof(CVertex), 1);
-	m_Graph.m_pEdges = (CEdge*)mem_alloc(m_Graph.m_NumEdges*sizeof(CEdge), 1);
 	for (int i = 0; i < m_Triangulation.m_Size; i++)
-		m_Graph.m_pVertices[i].m_Pos = m_Triangulation.m_pTriangles[i].m_Triangle.Centroid()*32 + vec2(16,16);
-	CEdge *pEdge = m_Graph.m_pEdges;
-	for (int i = 0; i < m_Triangulation.m_Size - 1; i++)
 	{
-		for (int j = i + 1; j < m_Triangulation.m_Size; j++)
+		vec2 Center = m_Triangulation.m_pTriangles[i].m_Triangle.Centroid()*32 + vec2(16,16);
+		for (int j = 0 ; j < 3 ; j++)
 		{
-			int count = 0;
-			for(int k = 0 ; k < 3; k++)
-				for(int l = 0; l < 3; l++)
-					if(m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[k] == m_Triangulation.m_pTriangles[j].m_Triangle.m_aPoints[l])
-						count++;
-			if(count == 2)
-			{
-				pEdge->m_Start = m_Graph.m_pVertices[i].m_Pos;
-				pEdge->m_End = m_Graph.m_pVertices[j].m_Pos;
-				pEdge->m_Size = 2;
-				pEdge->m_SnapID = GameServer()->Server()->SnapNewID();
-				pEdge++;
-				pEdge->m_Start = m_Graph.m_pVertices[j].m_Pos;
-				pEdge->m_End = m_Graph.m_pVertices[i].m_Pos;
-				pEdge->m_Size = 2;
-				pEdge->m_SnapID = GameServer()->Server()->SnapNewID();
-				pEdge++;
-			}
+			vec2 P = m_Triangulation.m_pTriangles[i].m_Triangle.m_aPoints[j]*32 + vec2(16,16);
+			int k = m_Graph.AddEdge(Center, P);
+			if(k >= 0)
+				m_Graph.SetEdgeData(k, GameServer()->Server()->SnapNewID());
 		}
 	}
 	m_Graph.ComputeClosestPath();
@@ -844,85 +929,51 @@ void CBotEngine::GetPath(vec2 VStart, vec2 VEnd, CPath *pPath)
 	pPath->m_pVertices[0] = VStart;
 	pPath->m_pVertices[pPath->m_Size+1] = VEnd;
 	pPath->m_Size = pPath->m_Size+2;
+	SmoothPath(pPath);
 }
 
-int CBotEngine::GetPartialPath(vec2 Pos, vec2 Target, vec2 *pVertices, int MaxSize)
+void CBotEngine::SmoothPath(CPath *pPath)
 {
-	int id[2] = {0};
-	vec2 aPos[] = {Pos,Target};
-	for(int j = 0 ; j < 2 ; j++)
+	vec2 NullVec(0,0);
+	for(int i = 0; i < pPath->m_Size; i++) {
+		if (NullVec.x > pPath->m_pVertices[i].x)
+			NullVec.x = pPath->m_pVertices[i].x - 1;
+		if (NullVec.y > pPath->m_pVertices[i].y)
+			NullVec.y = pPath->m_pVertices[i].y - 1;
+	}
+	bool Smoothed = true;
+	for(int It = 0; It < g_Config.m_SvBotSmoothPath && Smoothed && pPath->m_Size > 2; It++)
 	{
-		int d = 1000;
-		vec2 pt = aPos[j] / 32;
-		for(int k = 0; k < m_Triangulation.m_Size; k++)
+		Smoothed = false;
+		for(int i = 0; i < pPath->m_Size-2; i++)
 		{
-			if(m_Triangulation.m_pTriangles[k].m_Triangle.Inside(pt))
+			if(!GameServer()->Collision()->IntersectLine(pPath->m_pVertices[i],pPath->m_pVertices[i+2],0,0))
 			{
-				id[j] = k;
-				break;
-			}
-			int dist = distance(m_Graph.m_pVertices[k].m_Pos,aPos[j]);
-			if(dist < d)
-			{
-				d = dist;
-				id[j] = k;
+				pPath->m_pVertices[i+1] = NullVec;
+				i++;
+				Smoothed = true;
 			}
 		}
+		if(Smoothed)
+		{
+			int Size = 0;
+			for(int i = 0; i < pPath->m_Size; i++)
+			{
+				if(pPath->m_pVertices[i] != NullVec)
+				{
+					pPath->m_pVertices[Size] = pPath->m_pVertices[i];
+					Size++;
+				}
+			}
+			pPath->m_Size = Size;
+		}
 	}
-	int n = m_Graph.m_pClosestPath[id[0]+id[1]*m_Graph.m_NumVertices];
-	if( n < 0 )
-		return 0;
-	pVertices[0] = Pos;
-	int Size = 1;
-	while( Size < MaxSize-1 && id[0] != id[1])
-	{
-		pVertices[Size++] = m_Graph.m_pVertices[id[0]].m_Pos;
-		id[0] = m_Graph.m_pClosestPath[id[0]+id[1]*m_Graph.m_NumVertices];
-	}
-	pVertices[Size++] = m_Graph.m_pVertices[id[0]].m_Pos;
-	if(Size < MaxSize)
-		pVertices[Size++] = Target;
-	return Size;
 }
 
 vec2 CBotEngine::NextPoint(vec2 Pos, vec2 Target)
 {
-	int id[2] = {0};
-	vec2 aPos[] = {Pos,Target};
-	for(int j = 0 ; j < 2 ; j++)
-	{
-		int d = 1000;
-		vec2 pt = aPos[j] / 32;
-		for(int k = 0; k < m_Triangulation.m_Size; k++)
-		{
-			if(m_Triangulation.m_pTriangles[k].m_Triangle.Inside(pt))
-			{
-				id[j] = k;
-				break;
-			}
-			int dist = distance(m_Graph.m_pVertices[k].m_Pos,aPos[j]);
-			if(dist < d)
-			{
-				d = dist;
-				id[j] = k;
-			}
-		}
-	}
-	int n = m_Graph.m_pClosestPath[id[0]+id[1]*m_Graph.m_NumVertices];
-	if( n < 0 )
-		return Target;
-	return m_Graph.m_pVertices[n].m_Pos;
-}
-
-int CBotEngine::DistanceToEdge(CEdge Edge, vec2 Pos)
-{
-	if(!Edge.m_Size)
-		return -1;
-
-	// int ClosestRange = -1;
-
-	vec2 InterPos = closest_point_on_line(Edge.m_Start,Edge.m_End, Pos);
-	return distance(InterPos,Pos);
+	m_Graph.GetNextInPath(GetClosestVertex(Pos), GetClosestVertex(Target), &Target);
+	return Target;
 }
 
 // Need something smarter
@@ -947,35 +998,6 @@ int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 	return -1;
 }
 
-int CBotEngine::GetClosestEdge(vec2 Pos, int ClosestRange, CEdge *pEdge)
-{
-	CEdge* ClosestEdge = 0;
-
-	// int x = round_to_int(Pos.x/32);
-	// int y = round_to_int(Pos.y/32);
-
-	for(int k = 0; k < m_Graph.m_NumEdges; k++)
-	{
-		CEdge *pE = m_Graph.m_pEdges + k;
-		int D = DistanceToEdge(*pE, Pos);
-		if(D < 0)
-			continue;
-		if(D < ClosestRange || ClosestRange < 0)
-		{
-			ClosestEdge = pE;
-			ClosestRange = D;
-		}
-	}
-	if(ClosestEdge)
-	{
-		if(pEdge)
-		{
-			*pEdge = *ClosestEdge;
-		}
-		return ClosestRange;
-	}
-	return -1;
-}
 
 vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 {
@@ -985,15 +1007,15 @@ vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 	for(int k = 0; k < m_Triangulation.m_Size; k++)
 	{
 		if(m_Triangulation.m_pTriangles[k].m_Triangle.Inside(pt))
-			return m_Graph.m_pVertices[k].m_Pos;
-		int dist = distance(m_Graph.m_pVertices[k].m_Pos,Pos);
+			return m_Graph.GetVertex(k);
+		int dist = distance(m_Graph.GetVertex(k),Pos);
 		if(dist < d)
 		{
 			d = dist;
 			i = k;
 		}
 	}
-	return m_Graph.m_pVertices[i].m_Pos;
+	return m_Graph.GetVertex(i);
 }
 
 void CBotEngine::OnCharacterDeath(int Victim, int Killer, int Weapon)
@@ -1013,7 +1035,6 @@ void CBotEngine::UnRegisterBot(int CID)
 {
 	m_apBot[CID] = 0;
 }
-
 
 int CBotEngine::NetworkClipped(int SnappingClient, vec2 CheckPos)
 {
@@ -1049,32 +1070,15 @@ void CBotEngine::Snap(int SnappingClient)
 			pObj->m_StartTick = GameServer()->Server()->Tick();
 		}
 	}
-	for(int k = 0; k < 0 && m_Graph.m_NumEdges; k++)
+	for(int k = 0; k < m_Graph.NumEdges(); k++)
 	{
-		CEdge *pEdge = m_Graph.m_pEdges + k;
+		CGraph::CEdge Edge = m_Graph.GetEdge(k);
 
-		vec2 From = pEdge->m_Start;
-		vec2 To = pEdge->m_End;
+		vec2 From = m_Graph.GetVertex(Edge.m_Start);
+		vec2 To = m_Graph.GetVertex(Edge.m_End);
 		if(NetworkClipped(SnappingClient, To) && NetworkClipped(SnappingClient, From))
 			continue;
-		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, pEdge->m_SnapID, sizeof(CNetObj_Laser)));
-		if(!pObj)
-			return;
-		pObj->m_X = (int) To.x;
-		pObj->m_Y = (int) To.y;
-		pObj->m_FromX = (int) From.x;
-		pObj->m_FromY = (int) From.y;
-		pObj->m_StartTick = GameServer()->Server()->Tick();
-	}
-	for(int k = 0; k < m_SegmentCount; k++)
-	{
-		CSegment *pSegment = m_pSegments + k;
-
-		vec2 From = pSegment->m_A;
-		vec2 To = pSegment->m_B;
-		if(NetworkClipped(SnappingClient, To) && NetworkClipped(SnappingClient, From))
-			continue;
-		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, pSegment->m_SnapID, sizeof(CNetObj_Laser)));
+		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(GameServer()->Server()->SnapNewItem(NETOBJTYPE_LASER, Edge.m_Data, sizeof(CNetObj_Laser)));
 		if(!pObj)
 			return;
 		pObj->m_X = (int) To.x;
