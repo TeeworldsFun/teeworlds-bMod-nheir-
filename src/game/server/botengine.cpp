@@ -790,8 +790,8 @@ int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 {
 	for(int k = pPath->m_Size-1 ; k >=0 ; k--)
 	{
-		int D = distance(Pos, pPath->m_pVertices[k]);
-		if( D < 1000)
+		double D = distance(Pos, pPath->m_pVertices[k]);
+		if( D < 10000.f)
 		{
 			vec2 VertexPos = pPath->m_pVertices[k];
 			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;
@@ -811,13 +811,13 @@ int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 {
 	int i = 0;
-	int d = 1000;
+	double d = 1000.f;
 	vec2 pt = Pos / 32;
 	for(int k = 0; k < m_Triangulation.m_Size; k++)
 	{
 		if(m_Triangulation.m_pTriangles[k].m_Triangle.Inside(pt))
 			return m_Graph.GetVertex(k);
-		int dist = distance(m_Graph.GetVertex(k),Pos);
+		double dist = distance(m_Graph.GetVertex(k),Pos);
 		if(dist < d)
 		{
 			d = dist;
