@@ -78,6 +78,10 @@ void CBot::UpdateTarget()
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID] && GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
 
+	// Give up on actual target after 30s
+	if(m_ComputeTarget.m_StartTick + GameServer()->Server()->TickSpeed()*30 < GameServer()->Server()->Tick())
+		FindNewTarget = true;
+
 	if(m_ComputeTarget.m_Type == CTarget::TARGET_AIR)
 	{
 		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
@@ -95,6 +99,7 @@ void CBot::UpdateTarget()
 	{
 		m_ComputeTarget.m_NeedUpdate = true;
 		m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
+		m_ComputeTarget.m_StartTick = GameServer()->Server()->Tick();
 		vec2 NewTarget;
 		for(int i = 0 ; i < CTarget::NUM_TARGETS ; i++)
 		{

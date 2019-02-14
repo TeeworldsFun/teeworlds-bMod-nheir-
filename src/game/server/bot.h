@@ -98,6 +98,7 @@ protected:
 		int m_Type;
 		int m_PlayerCID;
 		bool m_NeedUpdate;
+		int m_StartTick;
 	} m_ComputeTarget;
 
 	int m_aTargetOrder[CTarget::NUM_TARGETS];
