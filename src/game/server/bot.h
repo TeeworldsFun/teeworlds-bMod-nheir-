@@ -6,8 +6,6 @@
 #include "gamecontext.h"
 #include "botengine.h"
 
-#include "ai/genetics.h"
-
 const char g_BotClan[12] = "Love";
 const char g_aBotName[MAX_CLIENTS][16] = {
 	"Anna",
@@ -102,7 +100,6 @@ protected:
 		bool m_NeedUpdate;
 	} m_ComputeTarget;
 
-	class CGenetics m_Genetics;
 	int m_aTargetOrder[CTarget::NUM_TARGETS];
 
 	void UpdateTargetOrder();
@@ -145,7 +142,7 @@ public:
 	void Snap(int SnappingClient);
 	void Tick();
 
-	virtual void OnReset();
+	void OnReset();
 
 	CNetObj_PlayerInput GetInputData() { return m_InputData; };
 	CNetObj_PlayerInput GetLastInputData() { return m_LastData; }

@@ -12,7 +12,7 @@
 #include "entities/flag.h"
 #include "entities/pickup.h"
 
-CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer) : m_Genetics(CTarget::NUM_TARGETS,10)
+CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 {
 	m_pBotEngine = pBotEngine;
 	m_pPlayer = pPlayer;
