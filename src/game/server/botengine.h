@@ -294,7 +294,7 @@ public:
 
 	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath);
 	void SmoothPath(CPath *pPath);
-	vec2 NextPoint(vec2 Pos, vec2 Target);
+	bool NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint);
 
 	int GetTile(int x, int y);
 	int GetTile(vec2 Pos);

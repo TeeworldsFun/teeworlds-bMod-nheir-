@@ -199,7 +199,7 @@ bool CGraph::GetNextInPath(vec2 VStart, vec2 VEnd, vec2 *pNextVertex) const
 	if (Start == End)
 		return true;
 
-	if(!pNextVertex)
+	if(pNextVertex)
 		*pNextVertex = GetVertex(m_pClosestPath[Start + End * NumVertices]);
 
 	return true;
@@ -779,10 +779,9 @@ void CBotEngine::SmoothPath(CPath *pPath)
 	}
 }
 
-vec2 CBotEngine::NextPoint(vec2 Pos, vec2 Target)
+bool CBotEngine::NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint)
 {
-	m_Graph.GetNextInPath(GetClosestVertex(Pos), GetClosestVertex(Target), &Target);
-	return Target;
+	return m_Graph.GetNextInPath(GetClosestVertex(Pos), GetClosestVertex(Target), NewPoint);
 }
 
 // Need something smarter

@@ -605,7 +605,17 @@ void CBot::MakeChoice(bool UseTarget)
 				m_Target -= Pos;
 			}
 			else
-				m_Target = BotEngine()->NextPoint(Pos,m_ComputeTarget.m_Pos) - Pos;
+			{
+				bool Ret = BotEngine()->NextPoint(Pos, m_ComputeTarget.m_Pos, &m_Target);
+				if(Ret)
+					m_Target -= Pos;
+				else
+				{
+					dbg_msg("bot", "could not find any path to target");
+					m_ComputeTarget.m_NeedUpdate = true;
+					return;
+				}
+			}
 		}
 	}
 
