@@ -21,7 +21,7 @@ CGameControllerCTF::CGameControllerCTF(CGameContext *pGameServer)
 }
 
 // balancing
-bool CGameControllerCTF::CanBeMovedOnBalance(int ClientID)
+bool CGameControllerCTF::CanBeMovedOnBalance(int ClientID) const
 {
 	CCharacter* Character = GameServer()->m_apPlayers[ClientID]->GetCharacter();
 	if(Character)
@@ -29,7 +29,7 @@ bool CGameControllerCTF::CanBeMovedOnBalance(int ClientID)
 		for(int fi = 0; fi < 2; fi++)
 		{
 			CFlag *F = m_apFlags[fi];
-			if(F->m_pCarryingCharacter == Character)
+			if(F && F->GetCarrier() == Character)
 				return false;
 		}
 	}
@@ -46,14 +46,12 @@ int CGameControllerCTF::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, 
 	for(int i = 0; i < 2; i++)
 	{
 		CFlag *F = m_apFlags[i];
-		if(F && pKiller && pKiller->GetCharacter() && F->m_pCarryingCharacter == pKiller->GetCharacter())
+		if(F && pKiller && pKiller->GetCharacter() && F->GetCarrier() == pKiller->GetCharacter())
 			HadFlag |= 2;
-		if(F && F->m_pCarryingCharacter == pVictim)
+		if(F && F->GetCarrier() == pVictim)
 		{
-			GameServer()->CreateSoundGlobal(SOUND_CTF_DROP);
-			F->m_DropTick = Server()->Tick();
-			F->m_pCarryingCharacter = 0;
-			F->m_Vel = vec2(0,0);
+			GameServer()->SendGameMsg(GAMEMSG_CTF_DROP, -1);
+			F->Drop();
 
 			if(pKiller && pKiller->GetTeam() != pVictim->GetPlayer()->GetTeam())
 				pKiller->m_Score++;
@@ -63,6 +61,12 @@ int CGameControllerCTF::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, 
 	}
 
 	return HadFlag;
+}
+
+void CGameControllerCTF::OnFlagReturn(CFlag *pFlag)
+{
+	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", "flag_return");
+	GameServer()->SendGameMsg(GAMEMSG_CTF_RETURN, -1);
 }
 
 bool CGameControllerCTF::OnEntity(int Index, vec2 Pos)
@@ -76,16 +80,13 @@ bool CGameControllerCTF::OnEntity(int Index, vec2 Pos)
 	if(Team == -1 || m_apFlags[Team])
 		return false;
 
-	CFlag *F = new CFlag(&GameServer()->m_World, Team);
-	F->m_StandPos = Pos;
-	F->m_Pos = Pos;
+	CFlag *F = new CFlag(&GameServer()->m_World, Team, Pos);
 	m_apFlags[Team] = F;
-	GameServer()->m_World.InsertEntity(F);
 	return true;
 }
 
 // game
-void CGameControllerCTF::DoWincheckMatch()
+bool CGameControllerCTF::DoWincheckMatch()
 {
 	// check score win condition
 	if((m_GameInfo.m_ScoreLimit > 0 && (m_aTeamscore[TEAM_RED] >= m_GameInfo.m_ScoreLimit || m_aTeamscore[TEAM_BLUE] >= m_GameInfo.m_ScoreLimit)) ||
@@ -94,16 +95,23 @@ void CGameControllerCTF::DoWincheckMatch()
 		if(m_SuddenDeath)
 		{
 			if(m_aTeamscore[TEAM_RED]/100 != m_aTeamscore[TEAM_BLUE]/100)
+			{
 				EndMatch();
+				return true;
+			}
 		}
 		else
 		{
 			if(m_aTeamscore[TEAM_RED] != m_aTeamscore[TEAM_BLUE])
+			{
 				EndMatch();
+				return true;
+			}
 			else
 				m_SuddenDeath = 1;
 		}
 	}
+	return false;
 }
 
 // general
@@ -118,14 +126,14 @@ void CGameControllerCTF::Snap(int SnappingClient)
 	pGameDataFlag->m_FlagDropTickRed = 0;
 	if(m_apFlags[TEAM_RED])
 	{
-		if(m_apFlags[TEAM_RED]->m_AtStand)
+		if(m_apFlags[TEAM_RED]->IsAtStand())
 			pGameDataFlag->m_FlagCarrierRed = FLAG_ATSTAND;
-		else if(m_apFlags[TEAM_RED]->m_pCarryingCharacter && m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer())
-			pGameDataFlag->m_FlagCarrierRed = m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer()->GetCID();
+		else if(m_apFlags[TEAM_RED]->GetCarrier() && m_apFlags[TEAM_RED]->GetCarrier()->GetPlayer())
+			pGameDataFlag->m_FlagCarrierRed = m_apFlags[TEAM_RED]->GetCarrier()->GetPlayer()->GetCID();
 		else
 		{
 			pGameDataFlag->m_FlagCarrierRed = FLAG_TAKEN;
-			pGameDataFlag->m_FlagDropTickRed = m_apFlags[TEAM_RED]->m_DropTick;
+			pGameDataFlag->m_FlagDropTickRed = m_apFlags[TEAM_RED]->GetDropTick();
 		}
 	}
 	else
@@ -133,14 +141,14 @@ void CGameControllerCTF::Snap(int SnappingClient)
 	pGameDataFlag->m_FlagDropTickBlue = 0;
 	if(m_apFlags[TEAM_BLUE])
 	{
-		if(m_apFlags[TEAM_BLUE]->m_AtStand)
+		if(m_apFlags[TEAM_BLUE]->IsAtStand())
 			pGameDataFlag->m_FlagCarrierBlue = FLAG_ATSTAND;
-		else if(m_apFlags[TEAM_BLUE]->m_pCarryingCharacter && m_apFlags[TEAM_BLUE]->m_pCarryingCharacter->GetPlayer())
-			pGameDataFlag->m_FlagCarrierBlue = m_apFlags[TEAM_BLUE]->m_pCarryingCharacter->GetPlayer()->GetCID();
+		else if(m_apFlags[TEAM_BLUE]->GetCarrier() && m_apFlags[TEAM_BLUE]->GetCarrier()->GetPlayer())
+			pGameDataFlag->m_FlagCarrierBlue = m_apFlags[TEAM_BLUE]->GetCarrier()->GetPlayer()->GetCID();
 		else
 		{
 			pGameDataFlag->m_FlagCarrierBlue = FLAG_TAKEN;
-			pGameDataFlag->m_FlagDropTickBlue = m_apFlags[TEAM_BLUE]->m_DropTick;
+			pGameDataFlag->m_FlagDropTickBlue = m_apFlags[TEAM_BLUE]->GetDropTick();
 		}
 	}
 	else
@@ -161,65 +169,45 @@ void CGameControllerCTF::Tick()
 		if(!F)
 			continue;
 
-		// flag hits death-tile or left the game layer, reset it
-		if(GameServer()->Collision()->GetCollisionAt(F->m_Pos.x, F->m_Pos.y)&CCollision::COLFLAG_DEATH || F->GameLayerClipped(F->m_Pos))
-		{
-			GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", "flag_return");
-			GameServer()->CreateSoundGlobal(SOUND_CTF_RETURN);
-			F->Reset();
-			continue;
-		}
-
 		//
-		if(F->m_pCarryingCharacter)
+		if(F->GetCarrier())
 		{
-			// update flag position
-			F->m_Pos = F->m_pCarryingCharacter->m_Pos;
-
-			if(m_apFlags[fi^1] && m_apFlags[fi^1]->m_AtStand)
+			if(m_apFlags[fi^1] && m_apFlags[fi^1]->IsAtStand())
 			{
-				if(distance(F->m_Pos, m_apFlags[fi^1]->m_Pos) < CFlag::ms_PhysSize + CCharacter::ms_PhysSize)
+				if(distance(F->GetPos(), m_apFlags[fi^1]->GetPos()) < CFlag::ms_PhysSize + CCharacter::ms_PhysSize)
 				{
 					// CAPTURE! \o/
 					m_aTeamscore[fi^1] += 100;
-					F->m_pCarryingCharacter->GetPlayer()->m_Score += 5;
+					F->GetCarrier()->GetPlayer()->m_Score += 5;
 
-					char aBuf[512];
+					char aBuf[64];
 					str_format(aBuf, sizeof(aBuf), "flag_capture player='%d:%s'",
-						F->m_pCarryingCharacter->GetPlayer()->GetCID(),
-						Server()->ClientName(F->m_pCarryingCharacter->GetPlayer()->GetCID()));
+						F->GetCarrier()->GetPlayer()->GetCID(),
+						Server()->ClientName(F->GetCarrier()->GetPlayer()->GetCID()));
 					GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
-					float CaptureTime = (Server()->Tick() - F->m_GrabTick)/(float)Server()->TickSpeed();
-					if(CaptureTime <= 60)
-					{
-						str_format(aBuf, sizeof(aBuf), "The %s flag was captured by '%s' (%d.%s%d seconds)", fi ? "blue" : "red", Server()->ClientName(F->m_pCarryingCharacter->GetPlayer()->GetCID()), (int)CaptureTime%60, ((int)(CaptureTime*100)%100)<10?"0":"", (int)(CaptureTime*100)%100);
-					}
-					else
-					{
-						str_format(aBuf, sizeof(aBuf), "The %s flag was captured by '%s'", fi ? "blue" : "red", Server()->ClientName(F->m_pCarryingCharacter->GetPlayer()->GetCID()));
-					}
-					GameServer()->SendChat(-1, -2, aBuf);
+					GameServer()->SendGameMsg(GAMEMSG_CTF_CAPTURE, fi, F->GetCarrier()->GetPlayer()->GetCID(), Server()->Tick()-F->GetGrabTick(), -1);
 					for(int i = 0; i < 2; i++)
 						m_apFlags[i]->Reset();
-
-					GameServer()->CreateSoundGlobal(SOUND_CTF_CAPTURE);
+					// do a win check(capture could trigger win condition)
+					if(DoWincheckMatch())
+						return;
 				}
 			}
 		}
 		else
 		{
 			CCharacter *apCloseCCharacters[MAX_CLIENTS];
-			int Num = GameServer()->m_World.FindEntities(F->m_Pos, CFlag::ms_PhysSize, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+			int Num = GameServer()->m_World.FindEntities(F->GetPos(), CFlag::ms_PhysSize, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 			for(int i = 0; i < Num; i++)
 			{
-				if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(F->m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL))
+				if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(F->GetPos(), apCloseCCharacters[i]->GetPos(), NULL, NULL))
 					continue;
 
-				if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == F->m_Team)
+				if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == F->GetTeam())
 				{
 					// return the flag
-					if(!F->m_AtStand)
+					if(!F->IsAtStand())
 					{
 						CCharacter *pChr = apCloseCCharacters[i];
 						pChr->GetPlayer()->m_Score += 1;
@@ -229,63 +217,31 @@ void CGameControllerCTF::Tick()
 							pChr->GetPlayer()->GetCID(),
 							Server()->ClientName(pChr->GetPlayer()->GetCID()));
 						GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
-
-						GameServer()->CreateSoundGlobal(SOUND_CTF_RETURN);
+						GameServer()->SendGameMsg(GAMEMSG_CTF_RETURN, -1);
 						F->Reset();
 					}
 				}
 				else
 				{
 					// take the flag
-					if(F->m_AtStand)
-					{
+					if(F->IsAtStand())
 						m_aTeamscore[fi^1]++;
-						F->m_GrabTick = Server()->Tick();
-					}
 
-					F->m_AtStand = 0;
-					F->m_pCarryingCharacter = apCloseCCharacters[i];
-					F->m_pCarryingCharacter->GetPlayer()->m_Score += 1;
+					F->Grab(apCloseCCharacters[i]);
+
+					F->GetCarrier()->GetPlayer()->m_Score += 1;
 
 					char aBuf[256];
 					str_format(aBuf, sizeof(aBuf), "flag_grab player='%d:%s'",
-						F->m_pCarryingCharacter->GetPlayer()->GetCID(),
-						Server()->ClientName(F->m_pCarryingCharacter->GetPlayer()->GetCID()));
+						F->GetCarrier()->GetPlayer()->GetCID(),
+						Server()->ClientName(F->GetCarrier()->GetPlayer()->GetCID()));
 					GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
-
-					for(int c = 0; c < MAX_CLIENTS; c++)
-					{
-						CPlayer *pPlayer = GameServer()->m_apPlayers[c];
-						if(!pPlayer)
-							continue;
-
-						if((pPlayer->GetTeam() == TEAM_SPECTATORS || pPlayer->m_DeadSpecMode) && pPlayer->GetSpectatorID() != SPEC_FREEVIEW &&
-							GameServer()->m_apPlayers[pPlayer->GetSpectatorID()] && GameServer()->m_apPlayers[pPlayer->GetSpectatorID()]->GetTeam() == fi)
-							GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_EN, c);
-						else if(pPlayer->GetTeam() == fi)
-							GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_EN, c);
-						else
-							GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_PL, c);
-					}
-					// demo record entry
-					GameServer()->CreateSoundGlobal(SOUND_CTF_GRAB_EN, -2);
+					GameServer()->SendGameMsg(GAMEMSG_CTF_GRAB, fi, -1);
 					break;
-				}
-			}
-
-			if(!F->m_pCarryingCharacter && !F->m_AtStand)
-			{
-				if(Server()->Tick() > F->m_DropTick + Server()->TickSpeed()*30)
-				{
-					GameServer()->CreateSoundGlobal(SOUND_CTF_RETURN);
-					F->Reset();
-				}
-				else
-				{
-					F->m_Vel.y += GameServer()->m_World.m_Core.m_Tuning.m_Gravity;
-					GameServer()->Collision()->MoveBox(&F->m_Pos, &F->m_Vel, vec2(F->ms_PhysSize, F->ms_PhysSize), 0.5f);
 				}
 			}
 		}
 	}
+	// do a win check(grabbing flags could trigger win condition)
+	DoWincheckMatch();
 }

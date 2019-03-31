@@ -7,6 +7,7 @@
 #include <game/version.h>
 
 #include "versionsrv.h"
+#include "mapversions.h"
 
 enum {
 	MAX_MAPS_PER_PACKET=48,
@@ -56,7 +57,7 @@ void BuildPackets()
 	}
 }
 
-void SendVer(NETADDR *pAddr)
+void SendVer(NETADDR *pAddr, TOKEN ResponseToken)
 {
 	CNetChunk p;
 	unsigned char aData[sizeof(VERSIONSRV_VERSION) + sizeof(GAME_RELEASE_VERSION)];
@@ -70,7 +71,7 @@ void SendVer(NETADDR *pAddr)
 	p.m_pData = aData;
 	p.m_DataSize = sizeof(aData);
 
-	g_NetOp.Send(&p);
+	g_NetOp.Send(&p, ResponseToken);
 }
 
 int main(int argc, char **argv) // ignore_convention
@@ -99,15 +100,17 @@ int main(int argc, char **argv) // ignore_convention
 
 		// process packets
 		CNetChunk Packet;
-		while(g_NetOp.Recv(&Packet))
+		TOKEN ResponseToken;
+		while(g_NetOp.Recv(&Packet, &ResponseToken))
 		{
 			if(Packet.m_DataSize == sizeof(VERSIONSRV_GETVERSION) &&
 				mem_comp(Packet.m_pData, VERSIONSRV_GETVERSION, sizeof(VERSIONSRV_GETVERSION)) == 0)
 			{
-				SendVer(&Packet.m_Address);
+				SendVer(&Packet.m_Address, ResponseToken);
 			}
 
-			if(Packet.m_DataSize == sizeof(VERSIONSRV_GETMAPLIST) &&
+			//disable that for now
+			/*if(Packet.m_DataSize == sizeof(VERSIONSRV_GETMAPLIST) &&
 				mem_comp(Packet.m_pData, VERSIONSRV_GETMAPLIST, sizeof(VERSIONSRV_GETMAPLIST)) == 0)
 			{
 				CNetChunk p;
@@ -119,9 +122,9 @@ int main(int argc, char **argv) // ignore_convention
 				{
 					p.m_DataSize = m_aPackets[i].m_Size;
 					p.m_pData = &m_aPackets[i].m_Data;
-					g_NetOp.Send(&p);
+					g_NetOp.Send(&p, ResponseToken);
 				}
-			}
+			}*/
 		}
 
 		// be nice to the CPU

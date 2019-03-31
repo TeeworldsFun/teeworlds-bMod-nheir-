@@ -138,11 +138,6 @@ public:
 		end = 0x0;
 	}
 
-	plain_range(const plain_range &r)
-	{
-		*this = r;
-	}
-
 	plain_range(T *b, T *e)
 	{
 		begin = b;
@@ -154,7 +149,7 @@ public:
 	void pop_back() { tl_assert(!empty()); end--; }
 	T& front() { tl_assert(!empty()); return *begin; }
 	T& back() { tl_assert(!empty()); return *(end-1); }
-	T& index(unsigned i) { tl_assert(i >= 0 && i < (unsigned)(end-begin)); return begin[i]; }
+	T& index(unsigned i) { tl_assert(i < (unsigned)(end-begin)); return begin[i]; }
 	unsigned size() const { return (unsigned)(end-begin); }
 	plain_range slice(unsigned startindex, unsigned endindex)
 	{
@@ -183,11 +178,6 @@ public:
 
 	plain_range_sorted()
 	{}
-
-	plain_range_sorted(const plain_range_sorted &r)
-	{
-		*this = r;
-	}
 
 	plain_range_sorted(T *b, T *e)
 	: parent(b, e)

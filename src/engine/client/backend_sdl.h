@@ -1,34 +1,9 @@
-
-#include "SDL.h"
-#include "SDL_opengl.h"
+#pragma once
 
 #include "graphics_threaded.h"
 
-
-
-// platform dependent implementations for transfering render context from the main thread to the graphics thread
-// TODO: when SDL 1.3 comes, this can be removed
-#if defined(CONF_FAMILY_WINDOWS)
-	struct SGLContext
-	{
-		HDC m_hDC;
-		HGLRC m_hGLRC;
-	};
-
-	static SGLContext GL_GetCurrentContext()
-	{
-		SGLContext Context;
-		Context.m_hDC = wglGetCurrentDC();
-		Context.m_hGLRC = wglGetCurrentContext();
-		return Context;
-	}
-
-	static void GL_MakeCurrent(const SGLContext &Context) { wglMakeCurrent(Context.m_hDC, Context.m_hGLRC); }
-	static void GL_ReleaseContext(const SGLContext &Context) { wglMakeCurrent(NULL, NULL); }
-	static void GL_SwapBuffers(const SGLContext &Context) { SwapBuffers(Context.m_hDC); }
-#elif defined(CONF_PLATFORM_MACOSX)
-
-	#include <AGL/agl.h>
+#if defined(CONF_PLATFORM_MACOSX)
+	#include <objc/objc-runtime.h>
 
 	class semaphore
 	{
@@ -40,47 +15,26 @@
 		void signal() { SDL_SemPost(sem); }
 	};
 
-	struct SGLContext
+	class CAutoreleasePool
 	{
-		AGLContext m_Context;
+	private:
+		id m_Pool;
+
+	public:
+		CAutoreleasePool()
+		{
+			Class NSAutoreleasePoolClass = (Class) objc_getClass("NSAutoreleasePool");
+			m_Pool = class_createInstance(NSAutoreleasePoolClass, 0);
+			SEL selector = sel_registerName("init");
+			objc_msgSend(m_Pool, selector);
+		}
+
+		~CAutoreleasePool()
+		{
+			SEL selector = sel_registerName("drain");
+			objc_msgSend(m_Pool, selector);
+		}
 	};
-
-	static SGLContext GL_GetCurrentContext()
-	{
-		SGLContext Context;
-		Context.m_Context = aglGetCurrentContext();
-		return Context;
-	}
-
-	static void GL_MakeCurrent(const SGLContext &Context) { aglSetCurrentContext(Context.m_Context); }
-	static void GL_ReleaseContext(const SGLContext &Context) { aglSetCurrentContext(NULL); }
-	static void GL_SwapBuffers(const SGLContext &Context) { aglSwapBuffers(Context.m_Context); }
-		
-#elif defined(CONF_FAMILY_UNIX)
-
-	#include <GL/glx.h>
-
-	struct SGLContext
-	{
-		Display *m_pDisplay;
-		GLXDrawable m_Drawable;
-		GLXContext m_Context;
-	};
-
-	static SGLContext GL_GetCurrentContext()
-	{
-		SGLContext Context;
-		Context.m_pDisplay = glXGetCurrentDisplay();
-		Context.m_Drawable = glXGetCurrentDrawable();
-		Context.m_Context = glXGetCurrentContext();
-		return Context;
-	}
-
-	static void GL_MakeCurrent(const SGLContext &Context) { glXMakeCurrent(Context.m_pDisplay, Context.m_Drawable, Context.m_Context); }
-	static void GL_ReleaseContext(const SGLContext &Context) { glXMakeCurrent(Context.m_pDisplay, None, 0x0); }
-	static void GL_SwapBuffers(const SGLContext &Context) { glXSwapBuffers(Context.m_pDisplay, Context.m_Drawable); }
-#else
-	#error missing implementation
 #endif
 
 
@@ -129,11 +83,51 @@ public:
 // takes care of opengl related rendering
 class CCommandProcessorFragment_OpenGL
 {
-	GLuint m_aTextures[CCommandBuffer::MAX_TEXTURES];
+	class CTexture
+	{
+	public:
+		enum
+		{
+			STATE_EMPTY = 0,
+			STATE_TEX2D = 1,
+			STATE_TEX3D = 2,
+
+			MIN_GL_MAX_3D_TEXTURE_SIZE = 64,																					// GL_MAX_3D_TEXTURE_SIZE must be at least 64 according to the standard
+			MAX_ARRAYSIZE_TEX3D = IGraphics::NUMTILES_DIMENSION * IGraphics::NUMTILES_DIMENSION / MIN_GL_MAX_3D_TEXTURE_SIZE,	// = 4
+		};
+		GLuint m_Tex2D;
+		GLuint m_Tex3D[MAX_ARRAYSIZE_TEX3D];
+		int m_State;
+		int m_Format;
+		int m_MemSize;
+	};
+	CTexture m_aTextures[CCommandBuffer::MAX_TEXTURES];
+	volatile int *m_pTextureMemoryUsage;
+	int m_MaxTexSize;
+	int m_Max3DTexSize;
+	int m_TextureArraySize;
+
+public:
+	enum
+	{
+		CMD_INIT = CCommandBuffer::CMDGROUP_PLATFORM_OPENGL,
+	};
+
+	struct SCommand_Init : public CCommandBuffer::SCommand
+	{
+		SCommand_Init() : SCommand(CMD_INIT) {}
+		volatile int *m_pTextureMemoryUsage;
+		int *m_pTextureArraySize;
+	};
+
+private:
 	static int TexFormatToOpenGLFormat(int TexFormat);
+	static unsigned char Sample(int w, int h, const unsigned char *pData, int u, int v, int Offset, int ScaleW, int ScaleH, int Bpp);
+	static void *Rescale(int Width, int Height, int NewWidth, int NewHeight, int Format, const unsigned char *pData);
 
 	void SetState(const CCommandBuffer::SState &State);
 
+	void Cmd_Init(const SCommand_Init *pCommand);
 	void Cmd_Texture_Update(const CCommandBuffer::SCommand_Texture_Update *pCommand);
 	void Cmd_Texture_Destroy(const CCommandBuffer::SCommand_Texture_Destroy *pCommand);
 	void Cmd_Texture_Create(const CCommandBuffer::SCommand_Texture_Create *pCommand);
@@ -151,18 +145,20 @@ public:
 class CCommandProcessorFragment_SDL
 {
 	// SDL stuff
-	SGLContext m_GLContext;
+	SDL_Window *m_pWindow;
+	SDL_GLContext m_GLContext;
 public:
 	enum
 	{
-		CMD_INIT = CCommandBuffer::CMDGROUP_PLATFORM,
+		CMD_INIT = CCommandBuffer::CMDGROUP_PLATFORM_SDL,
 		CMD_SHUTDOWN,
 	};
 
 	struct SCommand_Init : public CCommandBuffer::SCommand
 	{
 		SCommand_Init() : SCommand(CMD_INIT) {}
-		SGLContext m_Context;
+		SDL_Window *m_pWindow;
+		SDL_GLContext m_GLContext;
 	};
 
 	struct SCommand_Shutdown : public CCommandBuffer::SCommand
@@ -174,6 +170,7 @@ private:
 	void Cmd_Init(const SCommand_Init *pCommand);
 	void Cmd_Shutdown(const SCommand_Shutdown *pCommand);
 	void Cmd_Swap(const CCommandBuffer::SCommand_Swap *pCommand);
+	void Cmd_VSync(const CCommandBuffer::SCommand_VSync *pCommand);
 	void Cmd_VideoModes(const CCommandBuffer::SCommand_VideoModes *pCommand);
 public:
 	CCommandProcessorFragment_SDL();
@@ -194,15 +191,28 @@ class CCommandProcessor_SDL_OpenGL : public CGraphicsBackend_Threaded::ICommandP
 // graphics backend implemented with SDL and OpenGL
 class CGraphicsBackend_SDL_OpenGL : public CGraphicsBackend_Threaded
 {
-	SDL_Surface *m_pScreenSurface;
+	SDL_Window *m_pWindow;
+	SDL_GLContext m_GLContext;
 	ICommandProcessor *m_pProcessor;
-	SGLContext m_GLContext;
+	volatile int m_TextureMemoryUsage;
+	int m_NumScreens;
+	int m_TextureArraySize;
 public:
-	virtual int Init(const char *pName, int *Width, int *Height, int FsaaSamples, int Flags);
+	virtual int Init(const char *pName, int *Screen, int *Width, int *Height, int FsaaSamples, int Flags, int *pDesktopWidth, int *pDesktopHeight);
 	virtual int Shutdown();
+
+	virtual int MemoryUsage() const;
+	virtual int GetTextureArraySize() const { return m_TextureArraySize; }
+
+	virtual int GetNumScreens() const { return m_NumScreens; }
 
 	virtual void Minimize();
 	virtual void Maximize();
+	virtual bool Fullscreen(bool State);		// on=true/off=false
+	virtual void SetWindowBordered(bool State);	// on=true/off=false
+	virtual bool SetWindowScreen(int Index);
+	virtual int GetWindowScreen();
+	virtual bool GetDesktopResolution(int Index, int *pDesktopWidth, int* pDesktopHeight);
 	virtual int WindowActive();
 	virtual int WindowOpen();
 };
