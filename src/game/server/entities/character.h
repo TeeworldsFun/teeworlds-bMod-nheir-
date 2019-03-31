@@ -60,7 +60,7 @@ public:
 
 	int m_Kills;
 	int m_LastKill;
-	
+
 private:
 	// player controlling this character
 	class CPlayer *m_pPlayer;

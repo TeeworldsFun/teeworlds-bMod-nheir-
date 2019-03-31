@@ -548,8 +548,6 @@ void CCharacter::Tick()
 	if(m_Kills > 0 && m_LastKill + Server()->TickSpeed()*2 < Server()->Tick())
 		m_Kills = 0;
 
-	// Previnput
-	m_PrevInput = m_Input;
 	return;
 }
 
@@ -704,13 +702,32 @@ bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weap
 	if(From == m_pPlayer->GetCID())
 		return false;
 
+	// create healthmod indicator
+	GameServer()->CreateDamage(m_Pos, m_pPlayer->GetCID(), Source, m_Health, m_Armor, false);
+
 	// do damage Hit sound
 	if(From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
-		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));
+	{
+		int64 Mask = CmaskOne(From);
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(GameServer()->m_apPlayers[i] && (GameServer()->m_apPlayers[i]->GetTeam() == TEAM_SPECTATORS ||  GameServer()->m_apPlayers[i]->m_DeadSpecMode) &&
+				GameServer()->m_apPlayers[i]->GetSpectatorID() == From)
+				Mask |= CmaskOne(i);
+		}
+		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, Mask);
+	}
 
-	CCharacter *pChr = GameServer()->GetPlayerChar(From);
+	CCharacter *pChr = GameServer()->m_apPlayers[From]->GetCharacter();
 	if(pChr)
 	{
+		// set attacker's face to happy (taunt!)
+		if(From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
+		{
+			pChr->m_EmoteType = EMOTE_HAPPY;
+			pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
+		}
+
 		// give the attacker full ammo
 		if(!GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From))
 		{
@@ -738,12 +755,6 @@ bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weap
 			}
 		}
 
-		// set attacker's face to happy (taunt!)
-		if(From >= 0 && From != m_pPlayer->GetCID())
-		{
-			pChr->m_EmoteType = EMOTE_HAPPY;
-			pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
-		}
 	}
 
 	// kill the player
