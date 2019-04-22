@@ -404,7 +404,7 @@ bool CServer::IsBot(int ClientID) const
 
 bool CServer::IsBanned(int ClientID) const
 {
-	return m_ServerBan.IsBanned(m_NetServer.ClientAddr(ClientID), 0, 0);
+	return m_ServerBan.IsBanned(m_NetServer.ClientAddr(ClientID), 0, 0, 0);
 }
 
 int CServer::GetClientInfo(int ClientID, CClientInfo *pInfo) const
@@ -427,6 +427,12 @@ void CServer::GetClientAddr(int ClientID, char *pAddrStr, int Size) const
 		net_addr_str(m_NetServer.ClientAddr(ClientID), pAddrStr, Size, false);
 }
 
+int CServer::GetClientVersion(int ClientID) const
+{
+	if(ClientID >= 0 && ClientID < MAX_CLIENTS && m_aClients[ClientID].m_State == CClient::STATE_INGAME)
+		return m_aClients[ClientID].m_Version;
+	return 0;
+}
 
 const char *CServer::ClientName(int ClientID) const
 {
@@ -761,6 +767,7 @@ void CServer::SendMap(int ClientID)
 	Msg.AddInt(m_CurrentMapSize);
 	Msg.AddInt(m_MapChunksPerRequest);
 	Msg.AddInt(MAP_CHUNK_SIZE);
+	Msg.AddRaw(&m_CurrentMapSha256, sizeof(m_CurrentMapSha256));
 	SendMsg(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH, ClientID);
 }
 
@@ -904,7 +911,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 		}
 		else if(Msg == NETMSG_REQUEST_MAP_DATA)
 		{
-			if((pPacket->m_Flags&NET_CHUNKFLAG_VITAL) == 0 || m_aClients[ClientID].m_State == CClient::STATE_CONNECTING)
+			if((pPacket->m_Flags&NET_CHUNKFLAG_VITAL) != 0 && (m_aClients[ClientID].m_State == CClient::STATE_CONNECTING || m_aClients[ClientID].m_State == CClient::STATE_CONNECTING_AS_SPEC))
 			{
 				int ChunkSize = MAP_CHUNK_SIZE;
 
@@ -938,7 +945,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 		}
 		else if(Msg == NETMSG_READY)
 		{
-			if((pPacket->m_Flags&NET_CHUNKFLAG_VITAL) != 0 && m_aClients[ClientID].m_State == CClient::STATE_CONNECTING)
+			if((pPacket->m_Flags&NET_CHUNKFLAG_VITAL) != 0 && (m_aClients[ClientID].m_State == CClient::STATE_CONNECTING || m_aClients[ClientID].m_State == CClient::STATE_CONNECTING_AS_SPEC))
 			{
 				char aAddrStr[NETADDR_MAXSTRSIZE];
 				net_addr_str(m_NetServer.ClientAddr(ClientID), aAddrStr, sizeof(aAddrStr), true);
@@ -946,8 +953,10 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 				char aBuf[256];
 				str_format(aBuf, sizeof(aBuf), "player is ready. ClientID=%x addr=%s", ClientID, aAddrStr);
 				Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "server", aBuf);
+
+				bool ConnectAsSpec = m_aClients[ClientID].m_State == CClient::STATE_CONNECTING_AS_SPEC;
 				m_aClients[ClientID].m_State = CClient::STATE_READY;
-				GameServer()->OnClientConnected(ClientID);
+				GameServer()->OnClientConnected(ClientID, ConnectAsSpec);
 				SendConnectionReady(ClientID);
 			}
 		}
@@ -1289,9 +1298,14 @@ int CServer::LoadMap(const char *pMapName)
 	// reinit snapshot ids
 	m_IDPool.TimeoutIDs();
 
-	// get the crc of the map
+	// get the sha256 and crc of the map
+	m_CurrentMapSha256 = m_pMap->Sha256();
 	m_CurrentMapCrc = m_pMap->Crc();
+	char aSha256[SHA256_MAXSTRSIZE];
+	sha256_str(m_CurrentMapSha256, aSha256, sizeof(aSha256));
 	char aBufMsg[256];
+	str_format(aBufMsg, sizeof(aBufMsg), "%s sha256 is %s", aBuf, aSha256);
+	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "server", aBufMsg);
 	str_format(aBufMsg, sizeof(aBufMsg), "%s crc is %08x", aBuf, m_CurrentMapCrc);
 	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "server", aBufMsg);
 
@@ -1400,6 +1414,10 @@ int CServer::Run()
 				if(LoadMap(g_Config.m_SvMap))
 				{
 					// new map loaded
+					bool aSpecs[MAX_CLIENTS];
+					for(int c = 0; c < MAX_CLIENTS; c++)
+						aSpecs[c] = GameServer()->IsClientSpectator(c);
+
 					GameServer()->OnShutdown();
 
 					for(int c = 0; c < MAX_CLIENTS; c++)
@@ -1409,7 +1427,7 @@ int CServer::Run()
 
 						SendMap(c);
 						m_aClients[c].Reset();
-						m_aClients[c].m_State = CClient::STATE_CONNECTING;
+						m_aClients[c].m_State = aSpecs[c] ? CClient::STATE_CONNECTING_AS_SPEC : CClient::STATE_CONNECTING;
 					}
 
 					m_GameStartTime = time_get();
@@ -1607,7 +1625,7 @@ void CServer::DemoRecorder_HandleAutoStart()
 		char aDate[20];
 		str_timestamp(aDate, sizeof(aDate));
 		str_format(aFilename, sizeof(aFilename), "demos/%s_%s.demo", "auto/autorecord", aDate);
-		m_DemoRecorder.Start(Storage(), m_pConsole, aFilename, GameServer()->NetVersion(), m_aCurrentMap, m_CurrentMapCrc, "server");
+		m_DemoRecorder.Start(Storage(), m_pConsole, aFilename, GameServer()->NetVersion(), m_aCurrentMap, m_CurrentMapSha256, m_CurrentMapCrc, "server");
 		if(g_Config.m_SvAutoDemoMax)
 		{
 			// clean up auto recorded demos
@@ -1634,7 +1652,7 @@ void CServer::ConRecord(IConsole::IResult *pResult, void *pUser)
 		str_timestamp(aDate, sizeof(aDate));
 		str_format(aFilename, sizeof(aFilename), "demos/demo_%s.demo", aDate);
 	}
-	pServer->m_DemoRecorder.Start(pServer->Storage(), pServer->Console(), aFilename, pServer->GameServer()->NetVersion(), pServer->m_aCurrentMap, pServer->m_CurrentMapCrc, "server");
+	pServer->m_DemoRecorder.Start(pServer->Storage(), pServer->Console(), aFilename, pServer->GameServer()->NetVersion(), pServer->m_aCurrentMap, pServer->m_CurrentMapSha256, pServer->m_CurrentMapCrc, "server");
 }
 
 void CServer::ConStopRecord(IConsole::IResult *pResult, void *pUser)
@@ -1813,11 +1831,10 @@ int main(int argc, const char **argv) // ignore_convention
 		}
 	}
 
-	bool SkipPWGen = false;
 	if(secure_random_init() != 0)
 	{
 		dbg_msg("secure", "could not initialize secure RNG");
-		SkipPWGen = true;	// skip automatic password generation
+		return -1;
 	}
 
 	CServer *pServer = CreateServer();
@@ -1876,8 +1893,7 @@ int main(int argc, const char **argv) // ignore_convention
 
 	pEngine->InitLogfile();
 
-	if(!SkipPWGen)
-		pServer->InitRconPasswordIfUnset();
+	pServer->InitRconPasswordIfUnset();
 
 	// run the server
 	dbg_msg("server", "starting...");

@@ -723,7 +723,7 @@ void CConsole::ParseArguments(int NumArgs, const char **ppArguments)
 	for(int i = 0; i < NumArgs; i++)
 	{
 		// check for scripts to execute
-		if(ppArguments[i][0] == '-' && ppArguments[i][1] == 'f' && ppArguments[i][2] == 0)
+		if(str_comp("-f", ppArguments[i]) == 0)
 		{
 			if(NumArgs - i > 1)
 				ExecuteFile(ppArguments[i+1]);
@@ -936,7 +936,8 @@ void CConsole::DeregisterTempMap(const char *pName)
 
 void CConsole::DeregisterTempMapAll()
 {
-	m_pTempMapListHeap->Reset();
+	if(m_pTempMapListHeap)
+		m_pTempMapListHeap->Reset();
 	m_pFirstMapEntry = 0;
 	m_pLastMapEntry = 0;
 	m_NumMapListEntries = 0;
