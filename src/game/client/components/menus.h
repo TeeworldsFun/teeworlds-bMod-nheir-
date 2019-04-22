@@ -58,8 +58,8 @@ private:
 	void DoButton_MenuTabTop_Dummy(const char *pText, int Checked, const CUIRect *pRect, float Alpha);
 	int DoButton_Customize(CButtonContainer *pBC, IGraphics::CTextureHandle Texture, int SpriteID, const CUIRect *pRect, float ImageRatio);
 
-	int DoButton_CheckBox_Common(const void *pID, const char *pText, const char *pBoxText, const CUIRect *pRect, bool Checked=false);
-	int DoButton_CheckBox(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
+	int DoButton_CheckBox_Common(const void *pID, const char *pText, const char *pBoxText, const CUIRect *pRect, bool Checked=false, bool Locked=false);
+	int DoButton_CheckBox(const void *pID, const char *pText, int Checked, const CUIRect *pRect, bool Locked=false);
 	int DoButton_CheckBox_Number(const void *pID, const char *pText, int Checked, const CUIRect *pRect);
 
 	int DoButton_MouseOver(int ImageID, int SpriteID, const CUIRect *pRect);
@@ -672,6 +672,7 @@ private:
 	void RenderSettingsControls(CUIRect MainView);
 	void RenderSettingsGraphics(CUIRect MainView);
 	void RenderSettingsSound(CUIRect MainView);
+	void RenderSettingsStats(CUIRect MainView);
 	void RenderSettings(CUIRect MainView);
 
 	bool DoResolutionList(CUIRect* pRect, CListBoxState* pListBoxState,
@@ -682,6 +683,8 @@ private:
 	static float RenderSettingsControlsWeapon(CUIRect View, void *pUser);
 	static float RenderSettingsControlsVoting(CUIRect View, void *pUser);
 	static float RenderSettingsControlsChat(CUIRect View, void *pUser);
+	static float RenderSettingsControlsScoreboard(CUIRect View, void *pUser);
+	static float RenderSettingsControlsStats(CUIRect View, void *pUser);
 	static float RenderSettingsControlsMisc(CUIRect View, void *pUser);
 
 	void SetActive(bool Active);
