@@ -216,7 +216,6 @@ CBotEngine::CBotEngine(CGameContext *pGameServer)
 	m_CornerCount = 0;
 	m_SegmentCount = 0;
 	mem_zero(m_aPaths,sizeof(m_aPaths));
-	mem_zero(m_apBot,sizeof(m_apBot));
 }
 
 void CBotEngine::Free()
@@ -449,38 +448,7 @@ void CBotEngine::GenerateSegments()
 	dbg_msg("botengine","Found %d vertical segments, and %d horizontal segments", VSegmentCount, HSegmentCount);
 }
 
-int CBotEngine::SegmentComp(const void *a, const void *b)
-{
-	CSegment *s0 = (CSegment *)a;
-	CSegment *s1 = (CSegment *)b;
-	if(s0->m_IsVertical && !s1->m_IsVertical)
-		return 1;
-	if(!s0->m_IsVertical && s1->m_IsVertical)
-		return -1;
-	if(s0->m_IsVertical)
-	{
-		if(s0->m_A.x < s1->m_A.x)
-			return -1;
-		if(s0->m_A.x > s1->m_A.x)
-			return 1;
-		if(s0->m_A.y < s1->m_A.y)
-			return -1;
-		if(s0->m_A.y > s1->m_A.y)
-			return 1;
-		return 0;
-	}
-	if(s0->m_A.y < s1->m_A.y)
-		return -1;
-	if(s0->m_A.y > s1->m_A.y)
-		return 1;
-	if(s0->m_A.x < s1->m_A.x)
-		return -1;
-	if(s0->m_A.x > s1->m_A.x)
-		return 1;
-	return 0;
-}
-
-bool CBotEngine::IsCorner(int i, int j)
+bool CBotEngine::IsCorner(int i, int j) const
 {
 	if( i < 0 || i >= m_Width || j < 0 || j >= m_Height)
 		return false;
@@ -496,7 +464,7 @@ bool CBotEngine::IsCorner(int i, int j)
 	return g_IsInnerCorner[n] || g_IsOuterCorner[n];
 }
 
-bool CBotEngine::IsOnEdge(int i, int j)
+bool CBotEngine::IsOnEdge(int i, int j) const
 {
 	if( i < 0 || i >= m_Width || j < 0 || j >= m_Height)
 		return false;
@@ -687,24 +655,24 @@ void CBotEngine::GenerateGraphFromTriangles()
 	m_Graph.ComputeClosestPath();
 }
 
-int CBotEngine::GetTile(int x, int y)
+int CBotEngine::GetTile(int x, int y) const
 {
 	x = clamp(x,0,m_Width-1);
 	y = clamp(y,0,m_Height-1);
 	return m_pGrid[y*m_Width+x];
 }
 
-int CBotEngine::GetTile(vec2 Pos)
+int CBotEngine::GetTile(vec2 Pos) const
 {
 	return GetTile(round_to_int(Pos.x/32), round_to_int(Pos.y/32));
 }
 
-int CBotEngine::ConvertFromIndex(vec2 Pos)
+int CBotEngine::ConvertFromIndex(vec2 Pos) const
 {
 	return clamp(round_to_int(Pos.x/32), 0, m_Width-1)+clamp(round_to_int(Pos.y/32), 0, m_Width-1)*m_Width;
 }
 
-int CBotEngine::FastIntersectLine(int Id1, int Id2)
+int CBotEngine::FastIntersectLine(int Id1, int Id2) const
 {
 	int i1 = Id1%m_Width;
 	int i2 = Id2%m_Width;
@@ -732,7 +700,7 @@ int CBotEngine::FastIntersectLine(int Id1, int Id2)
 	return 0;
 }
 
-void CBotEngine::GetPath(vec2 VStart, vec2 VEnd, CPath *pPath)
+void CBotEngine::GetPath(vec2 VStart, vec2 VEnd, CPath *pPath) const
 {
 	pPath->m_Size = m_Graph.GetPath(GetClosestVertex(VStart),GetClosestVertex(VEnd),pPath->m_pVertices+1);
 	pPath->m_pVertices[0] = VStart;
@@ -741,7 +709,7 @@ void CBotEngine::GetPath(vec2 VStart, vec2 VEnd, CPath *pPath)
 	SmoothPath(pPath);
 }
 
-void CBotEngine::SmoothPath(CPath *pPath)
+void CBotEngine::SmoothPath(CPath *pPath) const
 {
 	vec2 NullVec(0,0);
 	for(int i = 0; i < pPath->m_Size; i++) {
@@ -780,13 +748,13 @@ void CBotEngine::SmoothPath(CPath *pPath)
 	}
 }
 
-bool CBotEngine::NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint)
+bool CBotEngine::NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint) const
 {
 	return m_Graph.GetNextInPath(GetClosestVertex(Pos), GetClosestVertex(Target), NewPoint);
 }
 
 // Need something smarter
-double CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
+double CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget) const
 {
 	for(int k = pPath->m_Size-1 ; k >=0 ; k--)
 	{
@@ -808,7 +776,7 @@ double CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 }
 
 
-vec2 CBotEngine::GetClosestVertex(vec2 Pos)
+vec2 CBotEngine::GetClosestVertex(vec2 Pos) const
 {
 	int i = 0;
 	double d = 1000.f;
@@ -827,29 +795,7 @@ vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 	return m_Graph.GetVertex(i);
 }
 
-void CBotEngine::OnCharacterDeath(int Victim, int Killer, int Weapon)
-{
-	if(m_apBot[Victim])
-		m_apBot[Victim]->m_GenomeTick >>= 1;
-	if(Killer >= 0 && m_apBot[Killer])
-		m_apBot[Killer]->m_GenomeTick <<= 1;
-
-	for (int i = 0 ; i < MAX_CLIENTS; i++)
-		if (m_apBot[i])
-			m_apBot[i]->OnCharacterDeath(Victim, Killer, Weapon);
-}
-
-void CBotEngine::RegisterBot(int CID, CBot *pBot)
-{
-	m_apBot[CID] = pBot;
-}
-
-void CBotEngine::UnRegisterBot(int CID)
-{
-	m_apBot[CID] = 0;
-}
-
-int CBotEngine::NetworkClipped(int SnappingClient, vec2 CheckPos)
+int CBotEngine::NetworkClipped(int SnappingClient, vec2 CheckPos) const
 {
 	if(SnappingClient == -1)
 		return 1;
@@ -865,7 +811,7 @@ int CBotEngine::NetworkClipped(int SnappingClient, vec2 CheckPos)
 	return 0;
 }
 
-void CBotEngine::Snap(int SnappingClient)
+void CBotEngine::Snap(int SnappingClient) const
 {
 	for(int k = 0; k < 0 && m_Triangulation.m_Size; k++)
 	{

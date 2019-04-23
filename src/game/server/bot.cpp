@@ -26,13 +26,10 @@ CBot::CBot(CBotEngine *pBotEngine, CPlayer *pPlayer)
 
 	m_pPath = &(pBotEngine->m_aPaths[pPlayer->GetCID()]);
 	UpdateTargetOrder();
-
-	BotEngine()->RegisterBot(m_pPlayer->GetCID(), this);
 }
 
 CBot::~CBot()
 {
-	BotEngine()->UnRegisterBot(m_pPlayer->GetCID());
 	m_pPath->m_Size = 0;
 	GameServer()->Server()->SnapFreeID(m_SnapID);
 }

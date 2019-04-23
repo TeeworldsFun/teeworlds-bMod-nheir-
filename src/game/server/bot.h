@@ -149,9 +149,6 @@ public:
 	CBot(class CBotEngine *m_pBotEngine, CPlayer *pPlayer);
 	~CBot();
 
-
-	int m_GenomeTick;
-
 	int GetID() { return m_SnapID; }
 	void Snap(int SnappingClient);
 	void Tick();

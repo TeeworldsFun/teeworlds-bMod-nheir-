@@ -82,7 +82,7 @@ class CTriangle {
 
 		vec2 m_aPoints[3];
 
-		bool Inside(vec2 pt) {
+		bool Inside(vec2 pt) const {
 			bool b1 = sign(pt, m_aPoints[0], m_aPoints[1]) < 0.0f;
 			bool b2 = sign(pt, m_aPoints[1], m_aPoints[2]) < 0.0f;
 			bool b3 = sign(pt, m_aPoints[2], m_aPoints[0]) < 0.0f;
@@ -90,7 +90,7 @@ class CTriangle {
 			return (b1 == b2) && (b2 == b3);
 		}
 
-		bool InsideOrSide(vec2 pt) {
+		bool InsideOrSide(vec2 pt) const {
 			if(Inside(pt))
 				return true;
 			float f1 = sign(pt, m_aPoints[0], m_aPoints[1]);
@@ -106,13 +106,13 @@ class CTriangle {
 			return false;
 		}
 
-		bool InsideOuterCircle(vec2 pt) {
+		bool InsideOuterCircle(vec2 pt) const {
 			vec2 Center = OuterCircleCenter();
 
 			return distance(pt, Center) <= distance(m_aPoints[0],Center);
 		}
 
-		float Square() {
+		float Square() const {
 			float a = distance(m_aPoints[0], m_aPoints[1]);
 			float b = distance(m_aPoints[1], m_aPoints[2]);
 			float c = distance(m_aPoints[2], m_aPoints[0]);
@@ -122,23 +122,23 @@ class CTriangle {
 			return sqrtf(p * (p - a) * (p - b) * (p - c));
 		}
 
-		vec2 CenterA() {
+		vec2 CenterA() const {
 			return (m_aPoints[0] + m_aPoints[1]) * 0.5;
 		}
 
-		vec2 CenterB() {
+		vec2 CenterB() const {
 			return (m_aPoints[1] + m_aPoints[2]) * 0.5;
 		}
 
-		vec2 CenterC() {
+		vec2 CenterC() const {
 			return (m_aPoints[2] + m_aPoints[0]) * 0.5;
 		}
 
-		vec2 Centroid() {
+		vec2 Centroid() const {
 			return vec2((m_aPoints[0].x + m_aPoints[1].x + m_aPoints[2].x) / 3.0f, (m_aPoints[0].y + m_aPoints[1].y + m_aPoints[2].y) / 3.0f);
 		}
 
-		bool IsFlat() {
+		bool IsFlat() const {
 			vec2 a = m_aPoints[0];
 			vec2 b = m_aPoints[1];
 			vec2 c = m_aPoints[2];
@@ -147,7 +147,7 @@ class CTriangle {
 								 c.x, c.y, 1)) < 0.0001;
 		}
 
-		vec2 OuterCircleCenter() {
+		vec2 OuterCircleCenter() const {
 			vec2 a = m_aPoints[0];
 			vec2 b = m_aPoints[1];
 			vec2 c = m_aPoints[2];
@@ -165,7 +165,7 @@ class CTriangle {
 			);
 		}
 
-		bool Intersects(CTriangle t) {
+		bool Intersects(CTriangle t) const {
 			int count = 0;
 			for (int i = 0; i < 3; i++) {
 				for (int j = 0; j < 3; j++) {
@@ -264,8 +264,8 @@ protected:
 
 	void Free();
 
-	bool IsCorner(int i, int j);
-	bool IsOnEdge(int i, int j);
+	bool IsCorner(int i, int j) const;
+	bool IsOnEdge(int i, int j) const;
 
 	void GenerateCorners();
 	void GenerateSegments();
@@ -274,8 +274,6 @@ protected:
 
 	vec2 m_aFlagStandPos[2];
 	int m_aBotSnapID[MAX_CLIENTS];
-
-	class CBot *m_apBot[MAX_CLIENTS];
 
 public:
 	CBotEngine(class CGameContext *pGameServer);
@@ -288,41 +286,35 @@ public:
 		int m_MaxSize;
 	} m_aPaths[MAX_CLIENTS];
 
-	int GetWidth() { return m_Width; }
-	CGraph *GetGraph() { return &m_Graph; }
-	vec2 GetFlagStandPos(int Team) { return m_aFlagStandPos[Team&1]; }
+	int GetWidth() const { return m_Width; }
+	const CGraph *GetGraph() const { return &m_Graph; }
+	vec2 GetFlagStandPos(int Team) const { return m_aFlagStandPos[Team&1]; }
 
-	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath);
-	void SmoothPath(CPath *pPath);
-	bool NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint);
+	void GetPath(vec2 VStart, vec2 VEnd, CPath* pPath) const;
+	void SmoothPath(CPath *pPath) const;
+	bool NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint) const;
 
-	int GetTile(int x, int y);
-	int GetTile(vec2 Pos);
-	int GetTile(int i) { return m_pGrid[i]; };
-	int FastIntersectLine(int Id1, int Id2);
-	int IntersectSegment(vec2 P1, vec2 P2, vec2 *pPos);
+	int GetTile(int x, int y) const;
+	int GetTile(vec2 Pos) const;
+	int GetTile(int i) const { return m_pGrid[i]; };
+	int FastIntersectLine(int Id1, int Id2) const;
+	int IntersectSegment(vec2 P1, vec2 P2, vec2 *pPos) const;
 
 	//int GetClosestEdge(vec2 Pos, int ClosestRange, CGraph::CEdge *pEdge);
 	vec2 GetClosestVertex(vec2 Pos);
-	double FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget);
+	double FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget) const;
 	//int DistanceToEdge(CGraph::CEdge Edge, vec2 Pos);
 
-	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
-	int ConvertFromIndex(vec2 Pos);
+	vec2 ConvertIndex(int ID) const { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
+	int ConvertFromIndex(vec2 Pos) const;
 
-	class CGameContext *GameServer() { return m_pGameServer;}
+	class CGameContext *GameServer() const { return m_pGameServer;}
 
 	void Init(class CTile *pTiles, int Width, int Height);
-	void Snap(int SnappingClient);
+	void Snap(int SnappingClient) const;
 	void OnRelease();
 
-	int NetworkClipped(int SnappingClient, vec2 CheckPos);
-
-	void OnCharacterDeath(int Victim, int Killer, int Weapon);
-	void RegisterBot(int CID, class CBot *pBot);
-	void UnRegisterBot(int CID);
-
-	static int SegmentComp(const void *a, const void *b);
+	int NetworkClipped(int SnappingClient, vec2 CheckPos) const;
 };
 
 #endif
