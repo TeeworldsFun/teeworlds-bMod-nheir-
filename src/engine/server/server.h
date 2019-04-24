@@ -129,6 +129,8 @@ public:
 		int m_Authed;
 		int m_AuthTries;
 
+		bool m_AI;
+
 		int m_MapChunk;
 		bool m_NoRconNote;
 		bool m_Quitting;
@@ -232,6 +234,9 @@ public:
 
 	static int NewClientCallback(int ClientID, void *pUser);
 	static int DelClientCallback(int ClientID, const char *pReason, void *pUser);
+
+	int NewAIClient(int ClientID);
+	int DelAIClient(int ClientID);
 
 	void SendMap(int ClientID);
 	void SendConnectionReady(int ClientID);
