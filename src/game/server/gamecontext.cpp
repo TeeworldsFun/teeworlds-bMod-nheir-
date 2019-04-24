@@ -729,6 +729,29 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	m_VoteUpdate = true;
 }
 
+bool CGameContext::AddAI(int ClientID) {
+	if(m_apPlayers[ClientID])
+		return false;
+	if(Server()->NewAIClient(ClientID) == 1)
+		return false;
+	dbg_msg("context","add ai: id=%x", ClientID);
+	OnClientConnected(ClientID, true, false);
+	// default name/clan
+	Server()->SetClientName(ClientID, "(ai)");
+	Server()->SetClientClan(ClientID, "(ai)");
+	// ready to enter the game
+	OnClientEnter(ClientID);
+	return true;
+}
+
+void CGameContext::DeleteAI(int ClientID) {
+	if(m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsAI())
+	{
+		dbg_msg("context","remove ai: id=%x", ClientID);
+		Server()->DelAIClient(ClientID);
+	}
+}
+
 void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 {
 	void *pRawMsg = m_NetObjHandler.SecureUnpackMsg(MsgID, pUnpacker);
@@ -1527,7 +1550,7 @@ void CGameContext::OnInit()
 	if(g_Config.m_DbgDummies)
 	{
 		for(int i = 0; i < g_Config.m_DbgDummies ; i++)
-			OnClientConnected(Server()->MaxClients() -i-1, true, false);
+			AddAI(Server()->MaxClients()-i-1);
 	}
 #endif
 }

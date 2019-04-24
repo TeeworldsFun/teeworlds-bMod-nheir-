@@ -154,6 +154,10 @@ public:
 	//
 	void SwapTeams();
 
+	//
+	bool AddAI(int ClientID);
+	void DeleteAI(int ClientID);
+
 	// engine events
 	virtual void OnInit();
 	virtual void OnConsoleInit();
