@@ -5,7 +5,6 @@
 
 #include "alloc.h"
 
-
 enum
 {
 	WEAPON_GAME = -3, // team switching etc
@@ -19,7 +18,7 @@ class CPlayer
 	MACRO_ALLOC_POOL_ID()
 
 public:
-	CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy, bool AsSpec = false);
+	CPlayer(CGameContext *pGameServer, int ClientID, bool AI = false, bool AsSpec = false);
 	~CPlayer();
 
 	void Init(int CID);
@@ -30,6 +29,7 @@ public:
 	int GetTeam() const { return m_Team; };
 	int GetCID() const { return m_ClientID; };
 	bool IsDummy() const { return m_Dummy; }
+	bool IsAI() const { return m_AI; }
 
 	void Tick();
 	void PostTick();
@@ -41,6 +41,9 @@ public:
 
 	void KillCharacter(int Weapon = WEAPON_GAME);
 	CCharacter *GetCharacter();
+
+	void SetAI(class CAI *pAI);
+	void TickAI();
 
 	//---------------------------------------------------------
 	// this is used for snapping so we know how we can clip the view for the player
@@ -124,6 +127,9 @@ private:
 	int m_ClientID;
 	int m_Team;
 	bool m_Dummy;
+
+	bool m_AI;
+	class CAI* m_pAI;
 
 	// used for spectator mode
 	int m_SpecMode;

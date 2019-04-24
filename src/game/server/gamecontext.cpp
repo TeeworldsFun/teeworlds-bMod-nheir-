@@ -551,17 +551,13 @@ void CGameContext::OnTick()
 	}
 
 
-#ifdef CONF_DEBUG
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(m_apPlayers[i] && m_apPlayers[i]->IsDummy())
+		if(m_apPlayers[i] && m_apPlayers[i]->IsAI())
 		{
-			CNetObj_PlayerInput Input = {0};
-			Input.m_Direction = (i&1)?-1:1;
-			m_apPlayers[i]->OnPredictedInput(&Input);
+			m_apPlayers[i]->TickAI();
 		}
 	}
-#endif
 }
 
 // Server hooks
@@ -629,12 +625,11 @@ void CGameContext::OnClientEnter(int ClientID)
 
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
-		if(i == ClientID || !m_apPlayers[i] || (!Server()->ClientIngame(i) && !m_apPlayers[i]->IsDummy()))
+		if(i == ClientID || !m_apPlayers[i] || !Server()->ClientIngame(i))
 			continue;
 
 		// new info for others
-		if(Server()->ClientIngame(i))
-			Server()->SendPackMsg(&NewClientInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, i);
+		Server()->SendPackMsg(&NewClientInfoMsg, MSGFLAG_VITAL|MSGFLAG_NORECORD, i);
 
 		// existing infos for new player
 		CNetMsg_Sv_ClientInfo ClientInfoMsg;
@@ -668,17 +663,11 @@ void CGameContext::OnClientEnter(int ClientID)
 	}
 }
 
-void CGameContext::OnClientConnected(int ClientID, bool Dummy, bool AsSpec)
+void CGameContext::OnClientConnected(int ClientID, bool AI, bool AsSpec)
 {
-	if(m_apPlayers[ClientID])
-	{
-		dbg_assert(m_apPlayers[ClientID]->IsDummy(), "invalid clientID");
-		OnClientDrop(ClientID, "removing dummy");
-	}
+	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, AI, AsSpec);
 
-	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, Dummy, AsSpec);
-
-	if(Dummy)
+	if(AI)
 		return;
 
 	// send active vote
@@ -1039,7 +1028,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			// update all clients
 			for(int i = 0; i < MAX_CLIENTS; ++i)
 			{
-				if(!m_apPlayers[i] || (!Server()->ClientIngame(i) && !m_apPlayers[i]->IsDummy()) || Server()->GetClientVersion(i) < MIN_SKINCHANGE_CLIENTVERSION)
+				if(!m_apPlayers[i] || (!Server()->ClientIngame(i) && !m_apPlayers[i]->IsAI()) || Server()->GetClientVersion(i) < MIN_SKINCHANGE_CLIENTVERSION)
 					continue;
 
 				SendSkinChange(pPlayer->GetCID(), i);

@@ -9,6 +9,7 @@
 #include "gamecontext.h"
 #include "gamecontroller.h"
 #include "player.h"
+#include "ais/dummy.h"
 
 
 IGameController::IGameController(CGameContext *pGameServer)
@@ -337,6 +338,11 @@ void IGameController::OnPlayerConnect(CPlayer *pPlayer)
 
 	// update game info
 	UpdateGameInfo(ClientID);
+
+	if(pPlayer->IsAI())
+	{
+		pPlayer->SetAI(new CAIDummy(pPlayer));
+	}
 }
 
 void IGameController::OnPlayerDisconnect(CPlayer *pPlayer)

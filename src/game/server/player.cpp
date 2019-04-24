@@ -6,13 +6,14 @@
 #include "gamecontext.h"
 #include "gamecontroller.h"
 #include "player.h"
+#include "ai.h"
 
 
 MACRO_ALLOC_POOL_ID_IMPL(CPlayer, MAX_CLIENTS)
 
 IServer *CPlayer::Server() const { return m_pGameServer->Server(); }
 
-CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy, bool AsSpec)
+CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool AI, bool AsSpec)
 {
 	m_pGameServer = pGameServer;
 	m_RespawnTick = Server()->Tick();
@@ -28,7 +29,8 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy, bool AsSpe
 	m_LastActionTick = Server()->Tick();
 	m_TeamChangeTick = Server()->Tick();
 	m_InactivityTickCounter = 0;
-	m_Dummy = Dummy;
+	m_AI = AI;
+	m_pAI = 0;
 	m_IsReadyToPlay = !GameServer()->m_pController->IsPlayerReadyMode();
 	m_RespawnDisabled = GameServer()->m_pController->GetStartRespawnState();
 	m_DeadSpecMode = false;
@@ -39,11 +41,12 @@ CPlayer::~CPlayer()
 {
 	delete m_pCharacter;
 	m_pCharacter = 0;
+	m_pAI = 0;
 }
 
 void CPlayer::Tick()
 {
-	if(!IsDummy() && !Server()->ClientIngame(m_ClientID))
+	if(!Server()->ClientIngame(m_ClientID))
 		return;
 
 	Server()->SetClientScore(m_ClientID, m_Score);
@@ -136,7 +139,7 @@ void CPlayer::PostTick()
 
 void CPlayer::Snap(int SnappingClient)
 {
-	if(!IsDummy() && !Server()->ClientIngame(m_ClientID))
+	if(!Server()->ClientIngame(m_ClientID))
 		return;
 
 	CNetObj_PlayerInfo *pPlayerInfo = static_cast<CNetObj_PlayerInfo *>(Server()->SnapNewItem(NETOBJTYPE_PLAYERINFO, m_ClientID, sizeof(CNetObj_PlayerInfo)));
@@ -469,4 +472,18 @@ void CPlayer::TryRespawn()
 	m_pCharacter = new(m_ClientID) CCharacter(&GameServer()->m_World);
 	m_pCharacter->Spawn(this, SpawnPos);
 	GameServer()->CreatePlayerSpawn(SpawnPos);
+}
+
+void CPlayer::SetAI(CAI *pAI) {
+	if(m_pAI) 
+		delete m_pAI;
+	m_pAI = pAI;
+}
+
+void CPlayer::TickAI() {
+	if(m_pAI) 
+	{
+		CNetObj_PlayerInput Input = m_pAI->GetInput();
+		OnPredictedInput(&Input);
+	}
 }
