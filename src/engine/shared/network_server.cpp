@@ -201,12 +201,13 @@ int CNetServer::Recv(CNetChunk *pChunk, TOKEN *pResponseToken)
 					{
 						if(m_aSlots[i].m_Connection.State() == NET_CONNSTATE_OFFLINE)
 						{
-							Found = true;
-							m_aSlots[i].m_Connection.SetToken(m_RecvUnpacker.m_Data.m_Token);
-							m_aSlots[i].m_Connection.Feed(&m_RecvUnpacker.m_Data, &Addr);
-							if(m_pfnNewClient)
-								m_pfnNewClient(i, m_UserPtr);
-							break;
+							if(!m_pfnNewClient || m_pfnNewClient(i, m_UserPtr) == 0) 
+							{
+								Found = true;
+								m_aSlots[i].m_Connection.SetToken(m_RecvUnpacker.m_Data.m_Token);
+								m_aSlots[i].m_Connection.Feed(&m_RecvUnpacker.m_Data, &Addr);
+								break;
+							}
 						}
 					}
 
