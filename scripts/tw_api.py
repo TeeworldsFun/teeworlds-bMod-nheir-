@@ -118,7 +118,7 @@ def get_server_info(address):
 
 		# Get info request
 		sock.sendto(header_connless(token_srv, token_cl) + PACKET_GETINFO + b'\x00', address)
-		data, addr = sock.recvfrom(4096)
+		data, addr = sock.recvfrom(NET_MAX_PACKETSIZE)
 		head = 	header_connless(token_cl, token_srv) + PACKET_INFO + b'\x00'
 		t1, t2 = unpack_header_connless(data)
 		assert (t1 == token_cl and t2 == token_srv), "Server %s info tokens mismatch: (%08x,%08x) != (%08x,%08x) (expected)" % (address, t1, t2, token_cl, token_srv)
