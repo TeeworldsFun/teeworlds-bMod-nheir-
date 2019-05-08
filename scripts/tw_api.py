@@ -10,6 +10,9 @@ import random
 NUM_MASTERSERVERS = 4
 MASTERSERVER_PORT = 8283
 
+# src/engine/shared/network.h
+NET_MAX_PACKETSIZE = 1400
+
 TIMEOUT = 2
 
 # src/mastersrv/mastersrv.h
@@ -63,6 +66,12 @@ def header_connless(token_srv, token_cl):
 	b[8] = (token_cl) & 0xff
 	return bytes(b)
 
+def unpack_header_connless(msg):
+	b = list(msg)
+	token1 = (b[1] << 24) + (b[2] << 16) + (b[3] << 8) + (b[4])
+	token2 = (b[5] << 24) + (b[6] << 16) + (b[7] << 8) + (b[8])
+	return token1, token2
+
 # CVariableInt::Unpack from src/engine/shared/compression.cpp
 def unpack_int(b):
 	l = list(b[:5])
@@ -95,18 +104,6 @@ def unpack_int(b):
 	res ^= -Sign
 	return res, b[i:]
 
-class Server_Info(threading.Thread):
-
-	def __init__(self, address):
-		self.address = address
-		self.finished = False
-		threading.Thread.__init__(self, target = self.run)
-
-	def run(self):
-		self.info = None
-		self.info = get_server_info(self.address)
-		self.finished = True
-
 def get_server_info(address):
 	try:
 		sock = socket(AF_INET, SOCK_DGRAM)
@@ -115,7 +112,7 @@ def get_server_info(address):
 
 		# Token request
 		sock.sendto(pack_control_msg_with_token(-1,token),address)
-		data, addr = sock.recvfrom(1024)
+		data, addr = sock.recvfrom(NET_MAX_PACKETSIZE)
 		token_cl, token_srv = unpack_control_msg_with_token(data)
 		assert token_cl == token, "Server %s send wrong token: %d (%d expected)" % (address, token_cl, token)
 
@@ -123,6 +120,8 @@ def get_server_info(address):
 		sock.sendto(header_connless(token_srv, token_cl) + PACKET_GETINFO + b'\x00', address)
 		data, addr = sock.recvfrom(4096)
 		head = 	header_connless(token_cl, token_srv) + PACKET_INFO + b'\x00'
+		t1, t2 = unpack_header_connless(data)
+		assert (t1 == token_cl and t2 == token_srv), "Server %s info tokens mismatch: (%08x,%08x) != (%08x,%08x) (expected)" % (address, t1, t2, token_cl, token_srv)
 		assert data[:len(head)] == head, "Server %s info header mismatch: %r != %r (expected)" % (address, data[:len(head)], head)
 		sock.close()
 
@@ -166,26 +165,13 @@ def get_server_info(address):
 	except OSError as e: # Timeout
 		print('> Server %s did not answer' % (address,))
 	except:
-		# print('> Server %s did something wrong here' % (address,))
-		# import traceback
-		# traceback.print_exc()
+		print('> Server %s did something wrong here' % (address,))
+		import traceback
+		traceback.print_exc()
 		pass
 	finally:
 		sock.close()
 	return None
-
-
-class Master_Server_Info(threading.Thread):
-
-	def __init__(self, address):
-		self.address = address
-		self.finished = False
-		threading.Thread.__init__(self, target = self.run)
-
-	def run(self):
-		self.servers = get_list(self.address)
-		self.finished = True
-
 
 def get_list(address):
 	servers = []
@@ -199,7 +185,7 @@ def get_list(address):
 
 		# Token request
 		sock.sendto(pack_control_msg_with_token(-1,token),address)
-		data, addr = sock.recvfrom(1024)
+		data, addr = sock.recvfrom(NET_MAX_PACKETSIZE)
 		token_cl, token_srv = unpack_control_msg_with_token(data)
 		assert token_cl == token, "Master %s send wrong token: %d (%d expected)" % (address, token_cl, token)
 		answer = True
@@ -209,7 +195,7 @@ def get_list(address):
 		head = 	header_connless(token_cl, token_srv) + PACKET_LIST
 
 		while 1:
-			data, addr = sock.recvfrom(1024)
+			data, addr = sock.recvfrom(NET_MAX_PACKETSIZE)
 			# Header should keep consistent
 			assert data[:len(head)] == head, "Master %s list header mismatch: %r != %r (expected)" % (address, data[:len(head)], head)
 
@@ -238,30 +224,37 @@ def get_list(address):
 
 	return servers
 
+class DataGetter(threading.Thread):
+	def __init__(self, function, *args):
+		threading.Thread.__init__(self, target = self._run, args=args)
+		self.data = None
+		self.function = function
+
+	def _run(self, *args):
+		self.data = self.function(*args)
+
 if __name__ == '__main__':
 	master_servers = []
 
 	for i in range(1, NUM_MASTERSERVERS+1):
-		m = Master_Server_Info(("master%d.teeworlds.com"%i, MASTERSERVER_PORT))
+		m = DataGetter(get_list, ("master%d.teeworlds.com"%i, MASTERSERVER_PORT))
 		master_servers.append(m)
 		m.start()
 		time.sleep(0.001) # avoid issues
 
 	servers = set()
 
-	while len(master_servers) != 0:
-		if master_servers[0].finished == True:
-			if master_servers[0].servers:
-				servers.update(master_servers[0].servers)
-			del master_servers[0]
-		time.sleep(0.001) # be nice
+	for master_server in master_servers:
+		master_server.join()
+		if master_server.data:
+			servers.update(master_server.data)
 
 	servers_info = []
 
 	print(str(len(servers)) + " servers")
 
 	for server in servers:
-		s = Server_Info(server)
+		s = DataGetter(get_server_info, server)
 		servers_info.append(s)
 		s.start()
 		time.sleep(0.001) # avoid issues
@@ -271,38 +264,38 @@ if __name__ == '__main__':
 	num_botplayers = 0
 	num_botspectators = 0
 
-	while len(servers_info) != 0:
-		if servers_info[0].finished == True:
-			if servers_info[0].info:
-				server_info = servers_info[0].info
-				# check num/max validity
-				if   server_info["num_players"] > server_info["max_players"] \
-					or server_info["num_clients"] > server_info["max_clients"] \
-					or server_info["max_players"] > server_info["max_clients"] \
-					or server_info["num_players"] < 0 \
-					or server_info["num_clients"] < 0 \
-					or server_info["max_clients"] < 0 \
-					or server_info["max_players"] < 0 \
-					or server_info["max_clients"] > 64:
-					server_info["bad"] = 'invalid num/max'
-					print('> Server %s has %s' % (server_info["address"], server_info["bad"]))
-				# check actual purity
-				elif server_info["gametype"] in ('DM', 'TDM', 'CTF', 'LMS', 'LTS') \
-					and server_info["max_players"] > 16:
-					server_info["bad"] = 'too many players for vanilla'
-					print('> Server %s has %s' % (server_info["address"], server_info["bad"]))
+	for server in servers_info:
+		server.join()
 
-				else:
-					num_players += server_info["num_players"]
-					num_clients += server_info["num_clients"]
-					for p in servers_info[0].info["players"]:
-						if p["player"] == 2:
-							num_botplayers += 1
-						if p["player"] == 3:
-							num_botspectators += 1
+		server_info = server.data
+		if not server_info:
+			continue
 
-			del servers_info[0]
+		# check num/max validity
+		if   server_info["num_players"] > server_info["max_players"] \
+			or server_info["num_clients"] > server_info["max_clients"] \
+			or server_info["max_players"] > server_info["max_clients"] \
+			or server_info["num_players"] < 0 \
+			or server_info["num_clients"] < 0 \
+			or server_info["max_clients"] < 0 \
+			or server_info["max_players"] < 0 \
+			or server_info["max_clients"] > 64:
+			server_info["bad"] = 'invalid num/max'
+			print('> Server %s has %s' % (server_info["address"], server_info["bad"]))
+		# check actual purity
+		elif server_info["gametype"] in ('DM', 'TDM', 'CTF', 'LMS', 'LTS') \
+			and server_info["max_players"] > 16:
+			server_info["bad"] = 'too many players for vanilla'
+			print('> Server %s has %s' % (server_info["address"], server_info["bad"]))
 
-		time.sleep(0.001) # be nice
+		else:
+			num_players += server_info["num_players"]
+			num_clients += server_info["num_clients"]
+			for p in server_info["players"]:
+				if p["player"] == 2:
+					num_botplayers += 1
+				if p["player"] == 3:
+					num_botspectators += 1
+
 
 	print('%d players (%d bots) and %d spectators (%d bots)' % (num_players, num_botplayers, num_clients - num_players, num_botspectators))
