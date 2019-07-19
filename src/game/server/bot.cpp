@@ -72,34 +72,79 @@ vec2 CBot::ClosestCharacter()
 	return Pos;
 }
 
-void CBot::UpdateTarget()
+CBot::CTarget CBot::GetNewTarget()
 {
-	bool FindNewTarget = m_ComputeTarget.m_Type == CTarget::TARGET_EMPTY;
-	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID] && GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID]->GetCharacter()))
+	CBot::CTarget Target = m_ComputeTarget;
+	bool FindNewTarget = Target.m_Type == CTarget::TARGET_EMPTY;
+	if(Target.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[Target.m_PlayerCID] && GameServer()->m_apPlayers[Target.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
 
 	// Give up on actual target after 30s
-	if(m_ComputeTarget.m_StartTick + GameServer()->Server()->TickSpeed()*30 < GameServer()->Server()->Tick())
+	if(Target.m_StartTick + GameServer()->Server()->TickSpeed()*30 < GameServer()->Server()->Tick())
 		FindNewTarget = true;
 
-	if(m_ComputeTarget.m_Type == CTarget::TARGET_AIR)
+	if(Target.m_Type == CTarget::TARGET_AIR)
 	{
-		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
+		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
 		if(dist < 60)
 			FindNewTarget = true;
 	}
-	if(m_ComputeTarget.m_Type > CTarget::TARGET_PLAYER)
+	if(Target.m_Type > CTarget::TARGET_PLAYER)
 	{
-		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), m_ComputeTarget.m_Pos);
+		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
 		if(dist < 28)
 			FindNewTarget = true;
 	}
 
+	// Bypass when flag game and flag close enough
+	if(GameServer()->m_pController->IsFlagGame()) {
+		int Team = m_pPlayer->GetTeam();
+		CGameControllerCTF *pController = (CGameControllerCTF*)GameServer()->m_pController;
+		CFlag **apFlags = pController->m_apFlags;
+		if(apFlags[Team] && distance(m_pPlayer->GetCharacter()->GetPos(), apFlags[Team]->GetPos()) < 300)
+		{
+			// Retrieve missing flag
+			if(!apFlags[Team]->IsAtStand() && !apFlags[Team]->GetCarrier())
+			{
+				Target.m_Pos = apFlags[Team]->GetPos();
+				Target.m_Type = CTarget::TARGET_FLAG;
+				return Target;
+			}
+			// Target flag carrier
+			if(!apFlags[Team]->IsAtStand() && apFlags[Team]->GetCarrier())
+			{
+				Target.m_Pos = apFlags[Team]->GetPos();
+				Target.m_Type = CTarget::TARGET_PLAYER;
+				Target.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
+				return Target;
+			}
+		}
+		if(apFlags[Team^1] && distance(m_pPlayer->GetCharacter()->GetPos(), apFlags[Team^1]->GetPos()) < 300)
+		{
+			// Go to enemy flagstand
+			if(apFlags[Team^1]->IsAtStand())
+			{
+				Target.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
+				Target.m_Type = CTarget::TARGET_FLAG;
+				dbg_msg("bot", "bypass, get flag");
+				return Target;
+			}
+			// Go to base carrying flag
+			if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter() && (!apFlags[Team] || apFlags[Team]->IsAtStand()))
+			{
+				Target.m_Pos = BotEngine()->GetFlagStandPos(Team);
+				Target.m_Type = CTarget::TARGET_FLAG;
+				dbg_msg("bot", "bypass, carry to base");
+				return Target;
+			}
+		}
+	}
+
 	if(FindNewTarget)
 	{
-		m_ComputeTarget.m_NeedUpdate = true;
-		m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
-		m_ComputeTarget.m_StartTick = GameServer()->Server()->Tick();
+		Target.m_NeedUpdate = true;
+		Target.m_Type = CTarget::TARGET_EMPTY;
+		Target.m_StartTick = GameServer()->Server()->Tick();
 		vec2 NewTarget;
 		for(int i = 0 ; i < CTarget::NUM_TARGETS ; i++)
 		{
@@ -115,17 +160,17 @@ void CBot::UpdateTarget()
 						// Retrieve missing flag
 						if(!apFlags[Team]->IsAtStand() && !apFlags[Team]->GetCarrier())
 						{
-							m_ComputeTarget.m_Pos = apFlags[Team]->GetPos();
-							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
-							return;
+							Target.m_Pos = apFlags[Team]->GetPos();
+							Target.m_Type = CTarget::TARGET_FLAG;
+							return Target;
 						}
 						// Target flag carrier
 						if(!apFlags[Team]->IsAtStand() && apFlags[Team]->GetCarrier())
 						{
-							m_ComputeTarget.m_Pos = apFlags[Team]->GetPos();
-							m_ComputeTarget.m_Type = CTarget::TARGET_PLAYER;
-							m_ComputeTarget.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
-							return;
+							Target.m_Pos = apFlags[Team]->GetPos();
+							Target.m_Type = CTarget::TARGET_PLAYER;
+							Target.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
+							return Target;
 						}
 					}
 					if(apFlags[Team^1])
@@ -133,16 +178,16 @@ void CBot::UpdateTarget()
 						// Go to enemy flagstand
 						if(apFlags[Team^1]->IsAtStand())
 						{
-							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
-							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
-							return;
+							Target.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
+							Target.m_Type = CTarget::TARGET_FLAG;
+							return Target;
 						}
 						// Go to base carrying flag
 						if(apFlags[Team^1]->GetCarrier() == m_pPlayer->GetCharacter() && (!apFlags[Team] || apFlags[Team]->IsAtStand()))
 						{
-							m_ComputeTarget.m_Pos = BotEngine()->GetFlagStandPos(Team);
-							m_ComputeTarget.m_Type = CTarget::TARGET_FLAG;
-							return;
+							Target.m_Pos = BotEngine()->GetFlagStandPos(Team);
+							Target.m_Type = CTarget::TARGET_FLAG;
+							return Target;
 						}
 					}
 				}
@@ -154,10 +199,10 @@ void CBot::UpdateTarget()
 			case CTarget::TARGET_WEAPON_LASER:
 				{
 					float Radius = distance(m_pPlayer->GetCharacter()->GetPos(), ClosestCharacter());
-					if(NeedPickup(m_aTargetOrder[i]) && FindPickup(m_aTargetOrder[i], &m_ComputeTarget.m_Pos, Radius))
+					if(NeedPickup(m_aTargetOrder[i]) && FindPickup(m_aTargetOrder[i], &Target.m_Pos, Radius))
 					{
-						m_ComputeTarget.m_Type = m_aTargetOrder[i];
-						return;
+						Target.m_Type = m_aTargetOrder[i];
+						return Target;
 					}
 				}
 				break;
@@ -176,10 +221,10 @@ void CBot::UpdateTarget()
 							if(c != m_pPlayer->GetCID() && GameServer()->m_apPlayers[c] && GameServer()->m_apPlayers[c]->GetCharacter() && (GameServer()->m_apPlayers[c]->GetTeam() != Team || !GameServer()->m_pController->IsTeamplay()))
 								Count--;
 						c--;
-						m_ComputeTarget.m_Pos = GameServer()->m_apPlayers[c]->GetCharacter()->GetPos();
-						m_ComputeTarget.m_Type = CTarget::TARGET_PLAYER;
-						m_ComputeTarget.m_PlayerCID = c;
-						return;
+						Target.m_Pos = GameServer()->m_apPlayers[c]->GetCharacter()->GetPos();
+						Target.m_Type = CTarget::TARGET_PLAYER;
+						Target.m_PlayerCID = c;
+						return Target;
 					}
 				}
 				break;
@@ -187,22 +232,36 @@ void CBot::UpdateTarget()
 				{
 					// Random destination
 					int r = random_int()%BotEngine()->GetGraph()->NumVertices();
-					m_ComputeTarget.m_Pos = BotEngine()->GetGraph()->GetVertex(r);
-					m_ComputeTarget.m_Type = CTarget::TARGET_AIR;
-					return;
+					Target.m_Pos = BotEngine()->GetGraph()->GetVertex(r);
+					Target.m_Type = CTarget::TARGET_AIR;
+					return Target;
 				}
 			}
 		}
 	}
 
-	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
+	if(Target.m_Type == CTarget::TARGET_PLAYER)
 	{
-		CPlayer *pPlayer = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID];
-		if(Collision()->FastIntersectLine(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
+		CPlayer *pPlayer = GameServer()->m_apPlayers[Target.m_PlayerCID];
+		if(Collision()->FastIntersectLine(Target.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
 		{
-			m_ComputeTarget.m_NeedUpdate = true;
-			m_ComputeTarget.m_Pos = pPlayer->GetCharacter()->GetPos();
+			Target.m_NeedUpdate = true;
+			Target.m_Pos = pPlayer->GetCharacter()->GetPos();
 		}
+	}
+	return Target;
+}
+
+void CBot::UpdateTarget()
+{
+	CBot::CTarget Target = GetNewTarget();
+	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type) {
+		m_ComputeTarget = Target;
+		m_ComputeTarget.m_NeedUpdate = true;
+	}
+	else if (Target.m_Type == CTarget::TARGET_FLAG && Target.m_Pos != m_ComputeTarget.m_Pos) {
+		m_ComputeTarget = Target;
+		m_ComputeTarget.m_NeedUpdate = true;
 	}
 }
 
@@ -598,7 +657,7 @@ void CBot::MakeChoice(bool UseTarget)
 
 		if(m_pPath->m_Size)
 		{
-			int dist = BotEngine()->FarestPointOnEdge(m_pPath, Pos, &m_Target);
+			double dist = BotEngine()->FarestPointOnEdge(m_pPath, Pos, &m_Target);
 			if(dist >= 0)
 			{
 				UseTarget = true;

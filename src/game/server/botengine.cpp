@@ -785,7 +785,7 @@ bool CBotEngine::NextPoint(vec2 Pos, vec2 Target, vec2* NewPoint)
 }
 
 // Need something smarter
-int CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
+double CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 {
 	for(int k = pPath->m_Size-1 ; k >=0 ; k--)
 	{

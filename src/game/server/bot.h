@@ -115,6 +115,7 @@ protected:
 	int m_Hook;
 
 	int GetTarget();
+	CTarget GetNewTarget();
 	void UpdateTarget();
 	int GetTeam(int ClientID);
 	int IsFalling();

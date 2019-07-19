@@ -304,7 +304,7 @@ public:
 
 	//int GetClosestEdge(vec2 Pos, int ClosestRange, CGraph::CEdge *pEdge);
 	vec2 GetClosestVertex(vec2 Pos);
-	int FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget);
+	double FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget);
 	//int DistanceToEdge(CGraph::CEdge Edge, vec2 Pos);
 
 	vec2 ConvertIndex(int ID) { return vec2(ID%m_Width,ID/m_Width)*32 + vec2(16.,16.); }
