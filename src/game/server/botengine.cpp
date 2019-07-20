@@ -814,7 +814,7 @@ vec2 CBotEngine::GetClosestVertex(vec2 Pos)
 	vec2 pt = Pos / 32;
 	for(int k = 0; k < m_Triangulation.m_Size; k++)
 	{
-		if(m_Triangulation.m_pTriangles[k].m_Triangle.Inside(pt))
+		if(m_Triangulation.m_pTriangles[k].m_Triangle.InsideOrSide(pt))
 			return m_Graph.GetVertex(k);
 		double dist = distance(m_Graph.GetVertex(k),Pos);
 		if(dist < d)
