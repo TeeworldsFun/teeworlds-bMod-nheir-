@@ -76,6 +76,15 @@ protected:
 		BFLAG_FIRE	= 16
 	};
 
+	enum {
+		BTARGET_NONE        = -1,
+		BTARGET_PLAYER      = 0,
+		BTARGET_GRAB_FLAG   = 1,
+		BTARGET_CARRY_FLAG  = 2,
+		BTARGET_RETURN_FLAG = 3,
+		BTARGET_PICKUP      = 4
+	};
+
 	int m_Flags;
 
 	vec2 m_Target;
@@ -96,6 +105,7 @@ protected:
 			NUM_TARGETS
 		};
 		int m_Type;
+		int m_SubType;
 		int m_PlayerCID;
 		bool m_NeedUpdate;
 		int m_StartTick;

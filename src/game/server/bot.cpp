@@ -76,6 +76,8 @@ CBot::CTarget CBot::GetNewTarget()
 {
 	CBot::CTarget Target = m_ComputeTarget;
 	bool FindNewTarget = Target.m_Type == CTarget::TARGET_EMPTY;
+
+	// Player target character doesn't exist
 	if(Target.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[Target.m_PlayerCID] && GameServer()->m_apPlayers[Target.m_PlayerCID]->GetCharacter()))
 		FindNewTarget = true;
 
@@ -83,12 +85,15 @@ CBot::CTarget CBot::GetNewTarget()
 	if(Target.m_StartTick + GameServer()->Server()->TickSpeed()*30 < GameServer()->Server()->Tick())
 		FindNewTarget = true;
 
+	// Close enough to random air target
 	if(Target.m_Type == CTarget::TARGET_AIR)
 	{
 		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
 		if(dist < 60)
 			FindNewTarget = true;
 	}
+
+	// Close enough to the pickup
 	if(Target.m_Type > CTarget::TARGET_PLAYER)
 	{
 		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
@@ -108,10 +113,11 @@ CBot::CTarget CBot::GetNewTarget()
 			{
 				Target.m_Pos = apFlags[Team]->GetPos();
 				Target.m_Type = CTarget::TARGET_FLAG;
+				Target.m_SubType = BTARGET_RETURN_FLAG;
 				return Target;
 			}
 			// Target flag carrier
-			if(!apFlags[Team]->IsAtStand() && apFlags[Team]->GetCarrier())
+			if(!apFlags[Team]->IsAtStand() && apFlags[Team]->GetCarrier() && apFlags[Team]->GetCarrier()->IsAlive())
 			{
 				Target.m_Pos = apFlags[Team]->GetPos();
 				Target.m_Type = CTarget::TARGET_PLAYER;
@@ -126,7 +132,7 @@ CBot::CTarget CBot::GetNewTarget()
 			{
 				Target.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
 				Target.m_Type = CTarget::TARGET_FLAG;
-				dbg_msg("bot", "bypass, get flag");
+				Target.m_SubType = BTARGET_GRAB_FLAG;
 				return Target;
 			}
 			// Go to base carrying flag
@@ -134,7 +140,7 @@ CBot::CTarget CBot::GetNewTarget()
 			{
 				Target.m_Pos = BotEngine()->GetFlagStandPos(Team);
 				Target.m_Type = CTarget::TARGET_FLAG;
-				dbg_msg("bot", "bypass, carry to base");
+				Target.m_SubType = BTARGET_CARRY_FLAG;
 				return Target;
 			}
 		}
@@ -162,6 +168,7 @@ CBot::CTarget CBot::GetNewTarget()
 						{
 							Target.m_Pos = apFlags[Team]->GetPos();
 							Target.m_Type = CTarget::TARGET_FLAG;
+							Target.m_SubType = BTARGET_RETURN_FLAG;
 							return Target;
 						}
 						// Target flag carrier
@@ -180,6 +187,7 @@ CBot::CTarget CBot::GetNewTarget()
 						{
 							Target.m_Pos = BotEngine()->GetFlagStandPos(Team^1);
 							Target.m_Type = CTarget::TARGET_FLAG;
+							Target.m_SubType = BTARGET_GRAB_FLAG;
 							return Target;
 						}
 						// Go to base carrying flag
@@ -187,6 +195,7 @@ CBot::CTarget CBot::GetNewTarget()
 						{
 							Target.m_Pos = BotEngine()->GetFlagStandPos(Team);
 							Target.m_Type = CTarget::TARGET_FLAG;
+							Target.m_SubType = BTARGET_CARRY_FLAG;
 							return Target;
 						}
 					}
@@ -255,11 +264,7 @@ CBot::CTarget CBot::GetNewTarget()
 void CBot::UpdateTarget()
 {
 	CBot::CTarget Target = GetNewTarget();
-	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type) {
-		m_ComputeTarget = Target;
-		m_ComputeTarget.m_NeedUpdate = true;
-	}
-	else if (Target.m_Type == CTarget::TARGET_FLAG && Target.m_Pos != m_ComputeTarget.m_Pos) {
+	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type || Target.m_SubType != m_ComputeTarget.m_SubType) {
 		m_ComputeTarget = Target;
 		m_ComputeTarget.m_NeedUpdate = true;
 	}
