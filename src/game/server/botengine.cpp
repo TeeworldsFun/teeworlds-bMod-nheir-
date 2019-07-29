@@ -756,7 +756,8 @@ void CBotEngine::SmoothPath(CPath *pPath)
 		Smoothed = false;
 		for(int i = 0; i < pPath->m_Size-2; i++)
 		{
-			if(!GameServer()->Collision()->IntersectLine(pPath->m_pVertices[i],pPath->m_pVertices[i+2],0,0))
+			vec2 W = direction(angle(normalize(pPath->m_pVertices[i+2]-pPath->m_pVertices[i]))+pi/2)*15.f;
+			if(!(GameServer()->Collision()->FastIntersectLine(pPath->m_pVertices[i]-W,pPath->m_pVertices[i+2]-W,0,0)) && !(GameServer()->Collision()->FastIntersectLine(pPath->m_pVertices[i]+W,pPath->m_pVertices[i+2]+W,0,0)))
 			{
 				pPath->m_pVertices[i+1] = NullVec;
 				i++;
@@ -793,7 +794,7 @@ double CBotEngine::FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget)
 		if( D < 10000.f)
 		{
 			vec2 VertexPos = pPath->m_pVertices[k];
-			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*14.f;
+			vec2 W = direction(angle(normalize(VertexPos-Pos))+pi/2)*15.f;
 			if(!(GameServer()->Collision()->FastIntersectLine(Pos-W,VertexPos-W,0,0)) && !(GameServer()->Collision()->FastIntersectLine(Pos+W,VertexPos+W,0,0)))
 			//if(!(FastIntersectLine(ConvertFromIndex(Pos),ConvertFromIndex(VertexPos))))
 			{
