@@ -77,12 +77,12 @@ protected:
 	};
 
 	enum {
-		BTARGET_NONE        = -1,
-		BTARGET_PLAYER      = 0,
-		BTARGET_GRAB_FLAG   = 1,
-		BTARGET_CARRY_FLAG  = 2,
-		BTARGET_RETURN_FLAG = 3,
-		BTARGET_PICKUP      = 4
+		BTARGET_NONE          = -1,
+		BTARGET_CHASE_CARRIER = 0,
+		BTARGET_GRAB_FLAG     = 1,
+		BTARGET_CARRY_FLAG    = 2,
+		BTARGET_RETURN_FLAG   = 3,
+		BTARGET_PICKUP        = 4
 	};
 
 	int m_Flags;

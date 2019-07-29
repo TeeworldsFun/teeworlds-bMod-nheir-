@@ -121,6 +121,7 @@ CBot::CTarget CBot::GetNewTarget()
 			{
 				Target.m_Pos = apFlags[Team]->GetPos();
 				Target.m_Type = CTarget::TARGET_PLAYER;
+				Target.m_SubType = BTARGET_CHASE_CARRIER;
 				Target.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
 				return Target;
 			}
@@ -150,7 +151,7 @@ CBot::CTarget CBot::GetNewTarget()
 	{
 		Target.m_NeedUpdate = true;
 		Target.m_Type = CTarget::TARGET_EMPTY;
-		Target.m_StartTick = GameServer()->Server()->Tick();
+		Target.m_SubType = BTARGET_NONE;
 		vec2 NewTarget;
 		for(int i = 0 ; i < CTarget::NUM_TARGETS ; i++)
 		{
@@ -176,6 +177,7 @@ CBot::CTarget CBot::GetNewTarget()
 						{
 							Target.m_Pos = apFlags[Team]->GetPos();
 							Target.m_Type = CTarget::TARGET_PLAYER;
+							Target.m_SubType = BTARGET_CHASE_CARRIER;
 							Target.m_PlayerCID = apFlags[Team]->GetCarrier()->GetPlayer()->GetCID();
 							return Target;
 						}
@@ -264,7 +266,12 @@ CBot::CTarget CBot::GetNewTarget()
 void CBot::UpdateTarget()
 {
 	CBot::CTarget Target = GetNewTarget();
+	if (Target.m_SubType != BTARGET_NONE && Target.m_SubType != m_ComputeTarget.m_SubType)
+	{
+		dbg_msg("bot", "Change flag target type: %d -> %d", m_ComputeTarget.m_SubType, Target.m_SubType);
+	}
 	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type || Target.m_SubType != m_ComputeTarget.m_SubType) {
+		m_ComputeTarget.m_StartTick = GameServer()->Server()->Tick();
 		m_ComputeTarget = Target;
 		m_ComputeTarget.m_NeedUpdate = true;
 	}
