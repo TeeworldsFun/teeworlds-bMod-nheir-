@@ -75,22 +75,22 @@ vec2 CBot::ClosestCharacter()
 CBot::CTarget CBot::GetNewTarget()
 {
 	CBot::CTarget Target = m_ComputeTarget;
-	bool FindNewTarget = Target.m_Type == CTarget::TARGET_EMPTY;
+	Target.m_NeedUpdate = Target.m_Type == CTarget::TARGET_EMPTY;
 
 	// Player target character doesn't exist
 	if(Target.m_Type == CTarget::TARGET_PLAYER && !(GameServer()->m_apPlayers[Target.m_PlayerCID] && GameServer()->m_apPlayers[Target.m_PlayerCID]->GetCharacter()))
-		FindNewTarget = true;
+		Target.m_NeedUpdate = true;
 
 	// Give up on actual target after 30s
 	if(Target.m_StartTick + GameServer()->Server()->TickSpeed()*30 < GameServer()->Server()->Tick())
-		FindNewTarget = true;
+		Target.m_NeedUpdate = true;
 
 	// Close enough to random air target
 	if(Target.m_Type == CTarget::TARGET_AIR)
 	{
 		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
 		if(dist < 60)
-			FindNewTarget = true;
+			Target.m_NeedUpdate = true;
 	}
 
 	// Close enough to the pickup
@@ -98,7 +98,7 @@ CBot::CTarget CBot::GetNewTarget()
 	{
 		float dist = distance(m_pPlayer->GetCharacter()->GetPos(), Target.m_Pos);
 		if(dist < 28)
-			FindNewTarget = true;
+			Target.m_NeedUpdate = true;
 	}
 
 	// Bypass when flag game and flag close enough
@@ -147,9 +147,8 @@ CBot::CTarget CBot::GetNewTarget()
 		}
 	}
 
-	if(FindNewTarget)
+	if(Target.m_NeedUpdate)
 	{
-		Target.m_NeedUpdate = true;
 		Target.m_Type = CTarget::TARGET_EMPTY;
 		Target.m_SubType = BTARGET_NONE;
 		vec2 NewTarget;
@@ -266,14 +265,14 @@ CBot::CTarget CBot::GetNewTarget()
 void CBot::UpdateTarget()
 {
 	CBot::CTarget Target = GetNewTarget();
-	if (Target.m_SubType != BTARGET_NONE && Target.m_SubType != m_ComputeTarget.m_SubType)
-	{
-		dbg_msg("bot", "Change flag target type: %d -> %d", m_ComputeTarget.m_SubType, Target.m_SubType);
-	}
-	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type || Target.m_SubType != m_ComputeTarget.m_SubType) {
-		m_ComputeTarget.m_StartTick = GameServer()->Server()->Tick();
+	// if (Target.m_SubType != BTARGET_NONE && Target.m_SubType != m_ComputeTarget.m_SubType)
+	// {
+	// 	dbg_msg("bot", "Change flag target type: %d -> %d", m_ComputeTarget.m_SubType, Target.m_SubType);
+	// }
+	if (Target.m_NeedUpdate || Target.m_Type != m_ComputeTarget.m_Type || Target.m_SubType != m_ComputeTarget.m_SubType || Target.m_PlayerCID != m_ComputeTarget.m_PlayerCID) {
 		m_ComputeTarget = Target;
 		m_ComputeTarget.m_NeedUpdate = true;
+		m_ComputeTarget.m_StartTick = GameServer()->Server()->Tick();
 	}
 }
 
