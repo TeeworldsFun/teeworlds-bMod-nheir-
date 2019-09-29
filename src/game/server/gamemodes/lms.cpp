@@ -13,6 +13,15 @@ CGameControllerLMS::CGameControllerLMS(CGameContext *pGameServer) : IGameControl
 	m_GameFlags = GAMEFLAG_SURVIVAL;
 }
 
+// event
+void CGameControllerLMS::OnCharacterSpawn(CCharacter *pChr)
+{
+	IGameController::OnCharacterSpawn(pChr);
+
+	// prevent respawn
+	pChr->GetPlayer()->m_RespawnDisabled = GetStartRespawnState();
+}
+
 // game
 void CGameControllerLMS::DoWincheckRound()
 {

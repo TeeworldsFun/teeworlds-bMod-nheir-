@@ -245,32 +245,14 @@ int IGameController::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, int
 
 void IGameController::OnCharacterSpawn(CCharacter *pChr)
 {
-	if(m_GameFlags&GAMEFLAG_SURVIVAL)
-	{
-		// give start equipment
-		// pChr->IncreaseHealth(10);
-		// pChr->IncreaseArmor(5);
+	// default health
+	pChr->IncreaseHealth(10);
 
-		// pChr->GiveWeapon(WEAPON_HAMMER, -1);
-		// pChr->GiveWeapon(WEAPON_GUN, 10);
-		// pChr->GiveWeapon(WEAPON_SHOTGUN, 10);
-		// pChr->GiveWeapon(WEAPON_GRENADE, 10);
-		// pChr->GiveWeapon(WEAPON_LASER, 5);
-
-		// prevent respawn
-		pChr->GetPlayer()->m_RespawnDisabled = GetStartRespawnState();
-	}
-	//else
-	{
-		// default health
-		pChr->IncreaseHealth(10);
-
-		// give default weapons
-		if(g_Config.m_SvInfiniteAmmo)
-			pChr->GiveWeapon(WEAPON_GRENADE, -1);
-		else
-			pChr->GiveWeapon(WEAPON_GRENADE, 5);
-	}
+	// give default weapons
+	if(g_Config.m_SvInfiniteAmmo)
+		pChr->GiveWeapon(WEAPON_GRENADE, -1);
+	else
+		pChr->GiveWeapon(WEAPON_GRENADE, 5);
 }
 
 void IGameController::OnFlagReturn(CFlag *pFlag)
@@ -487,7 +469,7 @@ void IGameController::ResetGame()
 {
 	// reset the game
 	GameServer()->m_World.m_ResetRequested = true;
-	
+
 	SetGameState(IGS_GAME_RUNNING);
 	m_GameStartTick = Server()->Tick();
 	m_SuddenDeath = 0;
@@ -512,7 +494,7 @@ void IGameController::SetGameState(EGameState GameState, int Timer)
 				// run warmup till there're enough players
 				m_GameState = GameState;
  				m_GameStateTimer = TIMER_INFINITE;
-		
+
 				// enable respawning in survival when activating warmup
 				if(m_GameFlags&GAMEFLAG_SURVIVAL)
 				{
@@ -551,7 +533,7 @@ void IGameController::SetGameState(EGameState GameState, int Timer)
 					m_GameState = GameState;
 					m_GameStateTimer = Timer*Server()->TickSpeed();
 				}
-		
+
 				// enable respawning in survival when activating warmup
 				if(m_GameFlags&GAMEFLAG_SURVIVAL)
 				{
@@ -888,6 +870,11 @@ bool IGameController::IsFriendlyFire(int ClientID1, int ClientID2) const
 	return false;
 }
 
+bool IGameController::IsFriendlyTeamFire(int Team1, int Team2) const
+{
+	return IsTeamplay() && !g_Config.m_SvTeamdamage && Team1 == Team2;
+}
+
 bool IGameController::IsPlayerReadyMode() const
 {
 	return g_Config.m_SvPlayerReadyMode != 0 && (m_GameStateTimer == TIMER_INFINITE && (m_GameState == IGS_WARMUP_USER || m_GameState == IGS_GAME_PAUSED));
@@ -932,7 +919,7 @@ void IGameController::ChangeMap(const char *pToMap)
 	if(m_GameState == IGS_WARMUP_GAME || m_GameState == IGS_WARMUP_USER)
 		SetGameState(IGS_GAME_RUNNING);
 	EndMatch();
-	
+
 	if(m_GameState != IGS_END_MATCH)
 	{
 		// game could not been ended, force cycle
@@ -1017,6 +1004,7 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos) const
 		return false;
 
 	CSpawnEval Eval;
+	Eval.m_RandomSpawn = IsSurvival();
 
 	if(IsTeamplay())
 	{
@@ -1085,7 +1073,7 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type) const
 			continue;	// try next spawn point
 
 		vec2 P = m_aaSpawnPoints[Type][i]+Positions[Result];
-		float S = EvaluateSpawnPos(pEval, P);
+		float S = pEval->m_RandomSpawn ? random_int() : EvaluateSpawnPos(pEval, P);
 		if(!pEval->m_Got || pEval->m_Score > S)
 		{
 			pEval->m_Got = true;
@@ -1164,7 +1152,7 @@ void IGameController::DoTeamChange(CPlayer *pPlayer, int Team, bool DoChatMsg)
 	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
 
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' m_Team=%d", ClientID, Server()->ClientName(ClientID), Team);
+	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' team=%d->%d", ClientID, Server()->ClientName(ClientID), OldTeam, Team);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
 	// update effected game settings
