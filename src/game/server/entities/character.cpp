@@ -759,39 +759,38 @@ bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weap
 		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, Mask);
 	}
 
-	CCharacter *pChr = GameServer()->m_apPlayers[From]->GetCharacter();
-	if(pChr)
+	if(From >= 0)
 	{
-		// set attacker's face to happy (taunt!)
-		if(From >= 0 && From != m_pPlayer->GetCID() && GameServer()->m_apPlayers[From])
+		// set attacker's face to happy (taunt!) and give some ammo
+		if(GameServer()->m_apPlayers[From])
 		{
-			pChr->m_EmoteType = EMOTE_HAPPY;
-			pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
-		}
-
-		// give the attacker full ammo
-		if(!GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From))
-		{
-			if(!g_Config.m_SvInfiniteAmmo && g_Config.m_SvKillAmmo)
-				pChr->GiveWeapon(WEAPON_GRENADE, 5);
-
-			// count the kills
-			pChr->m_Kills++;
-			pChr->m_LastKill = Server()->Tick();
-
-			// send emoteicon
-			if(pChr->m_Kills > 1)
+			CCharacter *pChr = GameServer()->m_apPlayers[From]->GetCharacter();
+			if(pChr)
 			{
-				switch(pChr->m_Kills)
+				pChr->m_EmoteType = EMOTE_HAPPY;
+				pChr->m_EmoteStop = Server()->Tick() + Server()->TickSpeed();
+
+				if(!g_Config.m_SvInfiniteAmmo && g_Config.m_SvKillAmmo)
+					pChr->GiveWeapon(WEAPON_GRENADE, 5);
+
+				// count the kills
+				pChr->m_Kills++;
+				pChr->m_LastKill = Server()->Tick();
+
+				// send emoteicon
+				if(pChr->m_Kills > 1)
 				{
-				case 2:
-					GameServer()->SendEmoticon(pChr->GetPlayer()->GetCID(), 1);
-					break;
-				case 3:
-					GameServer()->SendEmoticon(pChr->GetPlayer()->GetCID(), 10);
-					break;
-				default:
-					GameServer()->SendEmoticon(pChr->GetPlayer()->GetCID(), 14);
+					switch(pChr->m_Kills)
+					{
+					case 2:
+						GameServer()->SendEmoticon(From, 1);
+						break;
+					case 3:
+						GameServer()->SendEmoticon(From, 10);
+						break;
+					default:
+						GameServer()->SendEmoticon(From, 14);
+					}
 				}
 			}
 		}
