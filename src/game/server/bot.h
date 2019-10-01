@@ -134,6 +134,8 @@ protected:
 	bool NeedPickup(int Type);
 	bool FindPickup(int Type, vec2 *pPos, float Radius = 1000);
 
+	void GiveUpTarget();
+
 	void HandleWeapon(bool SeeTarget);
 	void HandleHook(bool SeeTarget);
 	void UpdateEdge();
@@ -158,6 +160,8 @@ public:
 
 	CNetObj_PlayerInput GetInputData() { return m_InputData; };
 	CNetObj_PlayerInput GetLastInputData() { return m_LastData; }
+
+	void OnCharacterDeath(int Victim, int Killer, int Weapon);
 };
 
 #endif

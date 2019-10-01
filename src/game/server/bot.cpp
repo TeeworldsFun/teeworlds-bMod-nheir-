@@ -72,6 +72,22 @@ vec2 CBot::ClosestCharacter()
 	return Pos;
 }
 
+void CBot::GiveUpTarget()
+{
+	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
+	m_ComputeTarget.m_NeedUpdate = true;
+}
+
+void CBot::OnCharacterDeath(int Victim, int Killer, int Weapon)
+{
+	(void) Weapon;
+	(void) Killer;
+	if (m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && m_ComputeTarget.m_PlayerCID == Victim)
+		GiveUpTarget();
+
+	GameServer()->SendEmoticon(m_pPlayer->GetCID(),EMOTICON_EYES);
+}
+
 CBot::CTarget CBot::GetNewTarget()
 {
 	CBot::CTarget Target = m_ComputeTarget;

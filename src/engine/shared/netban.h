@@ -69,7 +69,7 @@ protected:
 		int m_Hash;
 		int m_HashIndex;	// matching parts for ranges, 0 for addr
 
-		CNetHash() {}	
+		CNetHash() {}
 		CNetHash(const NETADDR *pAddr);
 		CNetHash(const CNetRange *pRange);
 
@@ -85,7 +85,7 @@ protected:
 		};
 		int m_Expires;
 		int m_LastInfoQuery;
-		char m_aReason[REASON_LENGTH];		
+		char m_aReason[REASON_LENGTH];
 	};
 
 	template<class T> struct CBan
@@ -112,7 +112,7 @@ protected:
 		int Remove(CBan<CDataType> *pBan);
 		void Update(CBan<CDataType> *pBan, const CBanInfo *pInfo);
 		void Reset();
-	
+
 		int Num() const { return m_CountUsed; }
 		bool IsFull() const { return m_CountUsed == MAX_BANS; }
 
@@ -147,7 +147,7 @@ protected:
 	typedef CBanPool<CNetRange, 16> CBanRangePool;
 	typedef CBan<NETADDR> CBanAddr;
 	typedef CBan<CNetRange> CBanRange;
-	
+
 	template<class T> void MakeBanInfo(CBan<T> *pBan, char *pBuf, unsigned BuffSize, int Type, int *pLastInfoQuery=0) const;
 	template<class T> int Ban(T *pBanPool, const typename T::CDataType *pData, int Seconds, const char *pReason);
 	template<class T> int Unban(T *pBanPool, const typename T::CDataType *pData);

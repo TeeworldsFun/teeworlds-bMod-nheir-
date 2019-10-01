@@ -831,8 +831,12 @@ void CBotEngine::OnCharacterDeath(int Victim, int Killer, int Weapon)
 {
 	if(m_apBot[Victim])
 		m_apBot[Victim]->m_GenomeTick >>= 1;
-	if(m_apBot[Killer])
+	if(Killer >= 0 && m_apBot[Killer])
 		m_apBot[Killer]->m_GenomeTick <<= 1;
+
+	for (int i = 0 ; i < MAX_CLIENTS; i++)
+		if (m_apBot[i])
+			m_apBot[i]->OnCharacterDeath(Victim, Killer, Weapon);
 }
 
 void CBotEngine::RegisterBot(int CID, CBot *pBot)

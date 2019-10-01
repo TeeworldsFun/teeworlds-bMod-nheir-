@@ -13,7 +13,8 @@ class CChat : public CComponent
 
 	enum
 	{
-		MAX_LINES = 50,
+		MAX_LINES = 250,
+		MAX_CHAT_PAGES = 10,
 	};
 
 	struct CLine
@@ -24,13 +25,13 @@ class CChat : public CComponent
 		int m_TargetID;
 		int m_Mode;
 		int m_NameColor;
-		char m_aName[64];
+		char m_aName[MAX_NAME_LENGTH];
 		char m_aText[512];
 		bool m_Highlighted;
 	};
 
 	// client IDs for special messages
-	enum 
+	enum
 	{
 		CLIENT_MSG = -2,
 		SERVER_MSG = -1,
@@ -52,6 +53,7 @@ class CChat : public CComponent
 	int m_WhisperTarget;
 	int m_LastWhisperFrom;
 	bool m_Show;
+	int m_BacklogPage;
 	bool m_InputUpdate;
 	int m_ChatStringOffset;
 	int m_OldChatStringLength;
@@ -61,6 +63,10 @@ class CChat : public CComponent
 	int m_PlaceholderOffset;
 	int m_PlaceholderLength;
 	bool m_ReverseCompletion;
+	bool m_FirstMap;
+
+	int m_ChatBufferMode;
+	char m_ChatBuffer[512];
 
 	struct CHistoryEntry
 	{
@@ -81,7 +87,7 @@ class CChat : public CComponent
 		void (*m_pfnFunc)(CChat *pChatData, const char* pCommand);
 		bool m_aFiltered; // 0 = shown, 1 = hidden
 	};
-		
+
 	class CChatCommands
 	{
 		CChatCommand *m_apCommands;
@@ -136,8 +142,13 @@ public:
 
 	void Say(int Team, const char *pLine);
 
+	void ClearChatBuffer();
+
+	const char* GetCommandName(int Mode);
+
 	virtual void OnInit();
 	virtual void OnReset();
+	virtual void OnMapLoad();
 	virtual void OnConsoleInit();
 	virtual void OnStateChange(int NewState, int OldState);
 	virtual void OnRender();
