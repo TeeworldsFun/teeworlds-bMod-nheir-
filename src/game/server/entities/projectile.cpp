@@ -30,7 +30,7 @@ CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, 
 	{
 		m_AffectedCharacters = 0;
 
-		if (Owner >= 0 && Owner <= MAX_CLIENTS) {
+		if (Owner >= 0 && Owner < MAX_CLIENTS) {
 			for(int i = 0; i < MAX_CLIENTS; ++i) {
 				if (GameServer()->m_apPlayers[i]) {
 					CPlayer *pPlayer = GameServer()->m_apPlayers[i];
