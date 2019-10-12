@@ -1,5 +1,7 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
+#include <engine/shared/config.h>
+
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 
@@ -21,6 +23,27 @@ CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, 
 	m_Weapon = Weapon;
 	m_StartTick = Server()->Tick();
 	m_Explosive = Explosive;
+
+	m_AffectedCharacters = CmaskAll();
+
+	if(m_Type == WEAPON_GRENADE)
+	{
+		m_AffectedCharacters = 0;
+
+		if (Owner >= 0 && Owner <= MAX_CLIENTS) {
+			for(int i = 0; i < MAX_CLIENTS; ++i) {
+				if (GameServer()->m_apPlayers[i]) {
+					CPlayer *pPlayer = GameServer()->m_apPlayers[i];
+					if (pPlayer->GetTeam() != TEAM_SPECTATORS &&
+						pPlayer->GetCharacter() &&
+						pPlayer->GetCharacter()->IsAlive() &&
+						!NetworkClipped(Owner, pPlayer->GetCharacter()->GetPos())) {
+							SetAffected(i, true);
+					}
+				}
+			}
+		}
+	}
 
 	GameWorld()->InsertEntity(this);
 }
@@ -83,9 +106,9 @@ void CProjectile::Tick()
 			GameServer()->CreateSound(CurPos, m_SoundImpact);
 
 		if(m_Explosive)
-			GameServer()->CreateExplosion(CurPos, m_Owner, m_Weapon, m_Damage);
+			GameServer()->CreateExplosion(CurPos, m_Owner, m_Weapon, m_Damage, m_AffectedCharacters);
 
-		else if(TargetChr)
+		else if(TargetChr && IsAffected(TargetChr->GetPlayer()->GetCID()))
 			TargetChr->TakeDamage(m_Direction * max(0.001f, m_Force), m_Direction*-1, m_Damage, m_Owner, m_Weapon);
 
 		GameServer()->m_World.DestroyEntity(this);
@@ -117,4 +140,32 @@ void CProjectile::Snap(int SnappingClient)
 	CNetObj_Projectile *pProj = static_cast<CNetObj_Projectile *>(Server()->SnapNewItem(NETOBJTYPE_PROJECTILE, GetID(), sizeof(CNetObj_Projectile)));
 	if(pProj)
 		FillInfo(pProj);
+}
+
+/*
+Spray protection inspired by https://github.com/prathje/teeworlds-plus
+commit: 9079bde1d4590be3c0973aed282eae4201e605f6
+Author: Patrick Rathje <pr@braune-digital.com>
+Date:   Thu Dec 24 23:35:20 2015 +0100
+*/
+
+bool CProjectile::IsAffected(int ClientID) const {
+	if (!g_Config.m_SvSprayprotection) {
+		return true;
+	}
+	if (ClientID < 0 || ClientID > MAX_CLIENTS) {
+		return true;
+	} else {
+		return CmaskIsSet(m_AffectedCharacters, ClientID);
+	}
+}
+
+void CProjectile::SetAffected(int ClientID, bool Affected) {
+	if (ClientID >= 0 && ClientID < MAX_CLIENTS) {
+		if (Affected) {
+			m_AffectedCharacters |= CmaskOne(ClientID);
+		} else {
+			m_AffectedCharacters &= CmaskAllExceptOne(ClientID);
+		}
+	}
 }
