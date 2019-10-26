@@ -134,8 +134,9 @@ MACRO_CONFIG_INT(SvVoteKickBantime, sv_vote_kick_bantime, 5, 0, 1440, CFGFLAG_SA
 
 // grenade insta
 MACRO_CONFIG_INT(SvAmmoRegen, sv_ammo_regen, 1000, 1, 1500, CFGFLAG_SERVER, "Set the regen speed")
+MACRO_CONFIG_INT(SvAmmoRegenBoost, sv_ammo_regen, 1, 0, 1, CFGFLAG_SERVER, "Regen grenades used as booster on explosion")
 MACRO_CONFIG_INT(SvInfiniteAmmo, sv_infinite_ammo, 0, 0, 1, CFGFLAG_SERVER, "Set the ammo to infinite")
-MACRO_CONFIG_INT(SvKillAmmo, sv_kill_ammo, 1, 0, 1, CFGFLAG_SERVER, "Set full ammo at kill")
+MACRO_CONFIG_INT(SvKillAmmo, sv_kill_ammo, 0, 0, 1, CFGFLAG_SERVER, "Set full ammo at kill")
 
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly
