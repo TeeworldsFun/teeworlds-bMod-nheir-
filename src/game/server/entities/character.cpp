@@ -737,7 +737,7 @@ bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weap
 
 	// grenade regen
 	if(g_Config.m_SvAmmoRegenBoost && Dmg > 4 && From == m_pPlayer->GetCID())
-		GiveWeapon(WEAPON_GRENADE, m_aWeapons[WEAPON_GRENADE].m_Ammo + 1);
+		GiveWeapon(WEAPON_GRENADE, min(m_aWeapons[WEAPON_GRENADE].m_Ammo + 1, 5));
 
 	// damage have to be bigger than 5
 	if(Dmg < 6)
