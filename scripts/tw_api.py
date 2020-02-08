@@ -120,7 +120,7 @@ class Server_Info(threading.Thread):
 
 	def  __str__(self):
 		return str(self.info)
-	
+
 	def __getitem__(self, key):
 		return self.info[key]
 
@@ -128,30 +128,60 @@ class Server_Info(threading.Thread):
 		self.info = get_server_info(self.address)
 		self.finished = True
 
+def unpack_server_info(data):
+	slots = data.split(b"\x00", maxsplit=5)
+
+	server_info = {}
+	server_info["version"] = slots[0].decode()
+	server_info["name"] = slots[1].decode()
+	server_info["hostname"] = slots[2].decode()
+	server_info["map"] = slots[3].decode()
+	server_info["gametype"] = slots[4].decode()
+	data = slots[5]
+
+	server_info["flags"], data = unpack_int(data)
+
+	server_info["skill"], data = unpack_int(data)
+	server_info["num_players"], data = unpack_int(data)
+	server_info["max_players"], data = unpack_int(data)
+	server_info["num_clients"], data = unpack_int(data)
+	server_info["max_clients"], data = unpack_int(data)
+	server_info["players"] = []
+
+	for _ in range(server_info["num_clients"]):
+		player = {}
+		slots = data.split(b"\x00", maxsplit=2)
+		player["name"] = slots[0].decode()
+		player["clan"] = slots[1].decode()
+		data = slots[2]
+		player["country"], data = unpack_int(data)
+		player["score"], data = unpack_int(data)
+		player["player"], data = unpack_int(data)
+		server_info["players"].append(player)
+
+	return server_info
+
+def send_token(sock, address, timeout=TIMEOUT):
+	token = random.randrange(0x100000000)
+
+	# Token request
+	sock.sendto(pack_control_msg_with_token(-1,token),address)
+
+	# send and receive
+	sock.settimeout(timeout)
+	data, _ = sock.recvfrom(BUFFER_SIZE)
+
+	# calculate expected token
+	token_cl, token_srv = unpack_control_msg_with_token(data)
+
+	# return, whether the correct token was received
+	return token_cl == token, token_cl, token_srv
 
 def get_server_info(address):
 
 	try:
 		sock = socket(AF_INET, SOCK_DGRAM)
 		sock.settimeout(TIMEOUT)
-		
-		# function definition
-		def send_token(sock, address, timeout=TIMEOUT):
-			token = random.randrange(0x100000000)
-
-			# Token request
-			sock.sendto(pack_control_msg_with_token(-1,token),address)
-
-			# send and receive
-			sock.settimeout(timeout)
-			data, _ = sock.recvfrom(BUFFER_SIZE)
-
-			# calculate expected token
-			token_cl, token_srv = unpack_control_msg_with_token(data)
-
-			# return, whether the correct token was received
-			return token_cl == token, token_cl, token_srv
-		
 
 		retries = NUM_RETRIES
 		token_success, token_cl, token_srv = send_token(sock, address)
@@ -159,28 +189,27 @@ def get_server_info(address):
 		while not token_success and retries > 0:
 			retries -= 1
 			token_success, token_cl, token_srv = send_token(sock, address, sock.gettimeout() * 2)
-		
+
+		if not token_success and retries == 0:
+			raise ValueError(f"Failed to retrieve token from: {address}")
+
 		sock.settimeout(TIMEOUT) # reset to default value
 
-		if retries == 0:
-			raise ValueError(f"Failed to retrieve token from: {address}")
-		
 		# function definition
-		def send_header(sock, address, token_cl, token_srv, timeout=TIMEOUT, sleep_secs = None):
+		def send_header(sock, address, token_cl, token_srv, timeout=TIMEOUT, sleep_secs=0):
 			# Get info request
 			sock.sendto(header_connless(token_srv, token_cl) + PACKET_GETINFO + b'\x00', address)
 			sock.settimeout(timeout)
-			if isinstance(sleep_secs, int):
+			if sleep_secs > 0:
 				time.sleep(sleep_secs)
 			data, _ = sock.recvfrom(BUFFER_SIZE)
-			
+
 			head = 	header_connless(token_cl, token_srv) + PACKET_INFO + b'\x00'
 
 			received_head = data[:len(head)] # get header
 			data = data[len(head):] # skip header
 
 			return received_head == head, data # we don't need the header
-		
 
 		data_success, data = send_header(sock, address, token_cl, token_srv)
 		retries = NUM_RETRIES
@@ -202,41 +231,12 @@ def get_server_info(address):
 				data_success, data = send_header(sock, address, token_cl, token_srv, sock.gettimeout() * 2.0, sleep_secs=sleep_secs)
 			if not data_success and retries == 0:
 				raise ValueError(f"Failed to retrieve server info from {address}")
-		
+
 		elif not data_success and retries == 0:
 			raise ValueError(f"Failed to retrieve server info from {address}")
 
-		slots = data.split(b"\x00", maxsplit=5)
-
-		server_info = {}
+		server_info = unpack_server_info(data)
 		server_info["address"] = address
-		server_info["version"] = slots[0].decode()
-		server_info["name"] = slots[1].decode()
-		server_info["hostname"] = slots[2].decode()
-		server_info["map"] = slots[3].decode()
-		server_info["gametype"] = slots[4].decode()
-		data = slots[5]
-
-		# these integers should fit in one byte each
-		server_info["flags"], server_info["skill"] = tuple(data[:2])
-		data = data[2:]
-
-		server_info["num_players"], data = unpack_int(data)
-		server_info["max_players"], data = unpack_int(data)
-		server_info["num_clients"], data = unpack_int(data)
-		server_info["max_clients"], data = unpack_int(data)
-		server_info["players"] = []
-
-		for _ in range(server_info["num_clients"]):
-			player = {}
-			slots = data.split(b"\x00", maxsplit=2)
-			player["name"] = slots[0].decode()
-			player["clan"] = slots[1].decode()
-			data = slots[2]
-			player["country"], data = unpack_int(data)
-			player["score"], data = unpack_int(data)
-			player["player"], data = unpack_int(data)
-			server_info["players"].append(player)
 
 		return server_info
 	except AssertionError as e:
@@ -268,6 +268,21 @@ class Master_Server_Info(threading.Thread):
 		self.servers = get_list(self.address)
 		self.finished = True
 
+def unpack_server_list(data):
+	servers = []
+	num_servers = len(data) // 18
+
+	for n in range(0, num_servers):
+		# IPv4
+		if data[n*18:n*18+12] == b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff":
+			ip = ".".join(map(str, data[n*18+12:n*18+16]))
+		# IPv6
+		else:
+			ip = ":".join(map(str, data[n*18:n*18+16]))
+		port = ((data[n*18+16])<<8) + data[n*18+17]
+		servers.append((ip, port))
+
+	return servers
 
 def get_list(address):
 	servers = []
@@ -277,42 +292,40 @@ def get_list(address):
 		sock = socket(AF_INET, SOCK_DGRAM)
 		sock.settimeout(TIMEOUT)
 
-		token = random.randrange(0x100000000)
+		retries = NUM_RETRIES
+		token_success, token_cl, token_srv = send_token(sock, address)
 
-		# Token request
-		sock.sendto(pack_control_msg_with_token(-1,token),address)
-		data, addr = sock.recvfrom(BUFFER_SIZE)
-		token_cl, token_srv = unpack_control_msg_with_token(data)
-		assert token_cl == token, "Master %s send wrong token: %d (%d expected)" % (address, token_cl, token)
+		while not token_success and retries > 0:
+			retries -= 1
+			token_success, token_cl, token_srv = send_token(sock, address, sock.gettimeout() * 2)
+
+		if not token_success and retries == 0:
+			raise ValueError(f"Failed to retrieve token from: {address}")
+
+		sock.settimeout(TIMEOUT) # reset to default value
+
 		answer = True
 
 		# Get list request
-		sock.sendto(header_connless(token_srv, token_cl) + PACKET_GETLIST, addr)
+		sock.sendto(header_connless(token_srv, token_cl) + PACKET_GETLIST, address)
 		head = 	header_connless(token_cl, token_srv) + PACKET_LIST
 
 		while 1:
 			data, addr = sock.recvfrom(BUFFER_SIZE)
 			# Header should keep consistent
-			assert data[:len(head)] == head, "Master %s list header mismatch: %r != %r (expected)" % (address, data[:len(head)], head)
 
-			data = data[len(head):]
-			num_servers = len(data) // 18
+			if data[:len(head)] != head:
+				raise ValueError("Master %s list header mismatch: %r != %r (expected)" % (address, data[:len(head)], head))
 
-			for n in range(0, num_servers):
-				# IPv4
-				if data[n*18:n*18+12] == b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff":
-					ip = ".".join(map(str, data[n*18+12:n*18+16]))
-				# IPv6
-				else:
-					ip = ":".join(map(str, data[n*18:n*18+16]))
-				port = ((data[n*18+16])<<8) + data[n*18+17]
-				servers += [(ip, port)]
+			servers += unpack_server_list(data[len(head):])
 
 	except AssertionError as e:
 		print(*e.args)
 	except OSError as e: # Timeout
 		if not answer:
 			print('> Master %s did not answer' % (address,))
+	except ValueError as e:
+		print(e)
 	except Exception as e:
 		# import traceback
 		# traceback.print_exc()
@@ -358,7 +371,7 @@ if __name__ == '__main__':
 
 	while len(servers_info) != 0:
 		servers_info[0].join()
-		
+
 		if servers_info[0].finished == True:
 			if servers_info[0].info:
 				server_info = servers_info[0].info
