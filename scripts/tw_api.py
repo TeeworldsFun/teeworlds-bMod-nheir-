@@ -29,12 +29,21 @@ PACKET_LIST = b"\xff\xff\xff\xfflis2"
 PACKET_GETINFO = b"\xff\xff\xff\xffgie3"
 PACKET_INFO = b"\xff\xff\xff\xffinf3"
 
+#
+NET_PACKETFLAG_CONNLESS = 8
+NET_PACKETVERSION = 1
+NET_PACKETFLAG_CONTROL = 1
+NET_CTRLMSG_TOKEN = 5
+NET_TOKENREQUEST_DATASIZE = 512
+
+def read_int_be(data, start=0, size=4):
+	ret = 0
+	for i in range(start, start+size):
+		ret = (ret << 8) + data[i]
+	return ret
 
 # see CNetBase::SendControlMsgWithToken
 def pack_control_msg_with_token(token_srv,token_cl):
-	NET_PACKETFLAG_CONTROL = 1
-	NET_CTRLMSG_TOKEN = 5
-	NET_TOKENREQUEST_DATASIZE = 512
 	b = [0]*(4 + 3 + NET_TOKENREQUEST_DATASIZE)
 	# Header
 	b[0] = (NET_PACKETFLAG_CONTROL<<2)&0xfc
@@ -60,8 +69,6 @@ def unpack_control_msg_with_token(msg):
 
 # CNetBase::SendPacketConnless
 def header_connless(token_srv, token_cl):
-	NET_PACKETFLAG_CONNLESS = 8
-	NET_PACKETVERSION = 1
 	b = [0]*9
 	# Header
 	b[0] = ((NET_PACKETFLAG_CONNLESS<<2)&0xfc) | (NET_PACKETVERSION&0x03)
@@ -110,13 +117,133 @@ def unpack_int(b):
 	return res, b[i:]
 
 
-class Server_Info(threading.Thread):
+class TokenError(Exception):
+	pass
 
+class TwConn(threading.Thread):
 	def __init__(self, address):
-		self.address = address
-		self.info = None
-		self.finished = False
 		threading.Thread.__init__(self, target = self.run)
+		self.address = address
+		self.local_token = None
+		self.remote_token = None
+		self.sock = None
+		self.logs = []
+		self.connless_handler = {}
+		self.ctrlmsg_handler = {}
+		self.finished = False
+
+	def log(self, msg):
+		self.logs.append(msg)
+
+	def initiate_conn(self):
+		self.sock = socket(AF_INET, SOCK_DGRAM)
+		self.sock.settimeout(TIMEOUT)
+
+	def send_connless(self, msg):
+		self.send(header_connless(self.remote_token, self.local_token) + msg)
+
+	def send_ctrlmsg(self, token, ctrlmsg, msg):
+		b = [0]*8
+		b[0] = (NET_PACKETFLAG_CONTROL<<2)&0xfc
+		# b[0:2] = ack/num_chunk
+		b[3] = (token >> 24) & 0xff
+		b[4] = (token >> 16) & 0xff
+		b[5] = (token >> 8) & 0xff
+		b[6] = (token) & 0xff
+		b[7] = ctrlmsg
+
+		self.send(bytes(b) + msg)
+
+	def send_ctrlmsg_with_token(self, token, ctrlmsg, extended=False):
+		b = [0]*NET_TOKENREQUEST_DATASIZE
+		# Data
+		b[0] = (self.local_token >> 24) & 0xff
+		b[1] = (self.local_token >> 16) & 0xff
+		b[2] = (self.local_token >> 8) & 0xff
+		b[3] = (self.local_token) & 0xff
+
+		if extended:
+			b = bytes(b)
+		else:
+			b = bytes(b[:4])
+
+		self.send_ctrlmsg(token, ctrlmsg, b)
+
+	def send(self, data):
+		return self.sock.sendto(data, self.address)
+
+	def recv(self):
+		data, addr = self.sock.recvfrom(BUFFER_SIZE)
+
+		flag = data[0] >> 2
+		if flag & NET_PACKETFLAG_CONNLESS:
+			version = data[0] & 3
+
+			if version != NET_PACKETVERSION:
+				self.log('wrong connless packet version, ignore')
+				return
+
+			token_recv = read_int_be(data, start=1)
+			token_send = read_int_be(data, start=5)
+
+			if self.remote_token != token_send or self.local_token != token_recv:
+				self.log('wrong token in connless packet, dropping tokens')
+				self.local_token = None
+				self.remote_token = None
+				return
+
+			header = data[9:17]
+
+			if header in self.connless_handler:
+				self.connless_handler[header](data[17:])
+
+		else:
+			ack = read_int_be(data, size=2) & 0x3ff
+			num_chunks = data[2]
+			token_recv = read_int_be(data, start=3)
+
+			if token_recv == 0xffffffff:
+				token_recv = -1
+			else:
+				if token_recv != self.local_token:
+					self.log("local token differs from received token, use the new token")
+					self.local_token = token_recv
+
+			if flag & NET_PACKETFLAG_CONTROL:
+				control_msg = data[7]
+				if control_msg == NET_CTRLMSG_TOKEN:
+					self.remote_token = read_int_be(data, start=8)
+
+				if control_msg in self.ctrlmsg_handler:
+					self.ctrlmsg_handler[control_msg](data[8:])
+
+	def request_token(self):
+		if not self.local_token:
+			self.local_token = random.randrange(0x100000000)
+
+		self.send_ctrlmsg_with_token(-1, NET_CTRLMSG_TOKEN, True)
+
+	def run(self):
+		self.initiate_conn()
+		self.request_token()
+		try:
+			self.recv()
+		except OSError as e: # Timeout
+			#print('> Server %s did not answer' % (address,))
+			pass
+		except Exception as e:
+			print(e)
+			pass
+		self.sock.close()
+
+		self.finished = True
+
+class Server_Info(TwConn):
+	def __init__(self, address):
+		TwConn.__init__(self, address)
+		self.info = None
+		self.connless_handler[PACKET_INFO] = self.server_info_handler
+		self.ctrlmsg_handler[NET_CTRLMSG_TOKEN] = self.token_success
 
 	def  __str__(self):
 		return str(self.info)
@@ -124,9 +251,14 @@ class Server_Info(threading.Thread):
 	def __getitem__(self, key):
 		return self.info[key]
 
-	def run(self):
-		self.info = get_server_info(self.address)
-		self.finished = True
+	def token_success(self, *args):
+		self.send_connless(PACKET_GETINFO + b'\x00')
+		self.recv()
+
+	def server_info_handler(self, data):
+		browser_token, data = unpack_int(data)
+		self.info = unpack_server_info(data)
+		self.info['address'] = self.address
 
 def unpack_server_info(data):
 	slots = data.split(b"\x00", maxsplit=5)
@@ -161,21 +293,6 @@ def unpack_server_info(data):
 
 	return server_info
 
-def send_token(sock, address, timeout=TIMEOUT):
-	token = random.randrange(0x100000000)
-
-	# Token request
-	sock.sendto(pack_control_msg_with_token(-1,token),address)
-
-	# send and receive
-	sock.settimeout(timeout)
-	data, _ = sock.recvfrom(BUFFER_SIZE)
-
-	# calculate expected token
-	token_cl, token_srv = unpack_control_msg_with_token(data)
-
-	# return, whether the correct token was received
-	return token_cl == token, token_cl, token_srv
 
 def get_server_info(address):
 
@@ -191,7 +308,7 @@ def get_server_info(address):
 			token_success, token_cl, token_srv = send_token(sock, address, sock.gettimeout() * 2)
 
 		if not token_success and retries == 0:
-			raise ValueError(f"Failed to retrieve token from: {address}")
+			raise TokenError(f"Failed to retrieve token from: {address}")
 
 		sock.settimeout(TIMEOUT) # reset to default value
 
@@ -256,17 +373,21 @@ def get_server_info(address):
 	return None
 
 
-class Master_Server_Info(threading.Thread):
+class Master_Server_Info(TwConn):
 
 	def __init__(self, address):
-		self.address = address
+		TwConn.__init__(self, address)
 		self.servers = []
-		self.finished = False
-		threading.Thread.__init__(self, target = self.run)
+		self.connless_handler[PACKET_LIST] = self.server_list_handler
+		self.ctrlmsg_handler[NET_CTRLMSG_TOKEN] = self.token_success
 
-	def run(self):
-		self.servers = get_list(self.address)
-		self.finished = True
+	def token_success(self, *args):
+		self.send_connless(PACKET_GETLIST)
+		self.recv()
+
+	def server_list_handler(self, data):
+		self.servers += unpack_server_list(data)
+		self.recv()
 
 def unpack_server_list(data):
 	servers = []
@@ -376,14 +497,14 @@ if __name__ == '__main__':
 			if servers_info[0].info:
 				server_info = servers_info[0].info
 				# check num/max validity
-				if   server_info["num_players"] > server_info["max_players"] \
-					or server_info["num_clients"] > server_info["max_clients"] \
-					or server_info["max_players"] > server_info["max_clients"] \
-					or server_info["num_players"] < 0 \
-					or server_info["num_clients"] < 0 \
-					or server_info["max_clients"] < 0 \
-					or server_info["max_players"] < 0 \
-					or server_info["max_clients"] > 64:
+				if (server_info["num_players"] > server_info["max_players"]
+					or server_info["num_clients"] > server_info["max_clients"]
+					or server_info["max_players"] > server_info["max_clients"]
+					or server_info["num_players"] < 0
+					or server_info["num_clients"] < 0
+					or server_info["max_clients"] < 0
+					or server_info["max_players"] < 0
+					or server_info["max_clients"] > 64):
 					server_info["bad"] = 'invalid num/max'
 					print('> Server %s has %s' % (server_info["address"], server_info["bad"]))
 				# check actual purity
