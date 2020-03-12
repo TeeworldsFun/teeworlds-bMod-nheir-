@@ -372,15 +372,15 @@ void CBot::Tick()
 		m_RealTarget = pClosest->m_Pos;
 	}
 
-	if(g_Config.m_SvBotAllowMove)
+	if(GameServer()->Config()->m_SvBotAllowMove)
 		MakeChoice(InSight);
 
 	m_RealTarget = m_Target + Pos;
 
-	if(g_Config.m_SvBotAllowFire && m_pPlayer->GetCharacter()->CanFire())
+	if(GameServer()->Config()->m_SvBotAllowFire && m_pPlayer->GetCharacter()->CanFire())
 		HandleWeapon(InSight);
 
-	if(g_Config.m_SvBotAllowMove && g_Config.m_SvBotAllowHook)
+	if(GameServer()->Config()->m_SvBotAllowMove && GameServer()->Config()->m_SvBotAllowHook)
 		HandleHook(InSight);
 
 	if(m_Flags & BFLAG_LEFT)
@@ -403,12 +403,12 @@ void CBot::Tick()
 	}
 
 
-	if(!g_Config.m_SvBotAllowMove) {
+	if(!GameServer()->Config()->m_SvBotAllowMove) {
 		m_InputData.m_Direction = 0;
 		m_InputData.m_Jump = 0;
 		m_InputData.m_Hook = 0;
 	}
-	if(!g_Config.m_SvBotAllowHook)
+	if(!GameServer()->Config()->m_SvBotAllowHook)
 		m_InputData.m_Hook = 0;
 
 	m_LastData = m_InputData;
@@ -651,7 +651,7 @@ void CBot::HandleWeapon(bool SeeTarget)
 
 
 	// Accuracy
-	if (g_Config.m_SvBotAccuracyError) {
+	if (GameServer()->Config()->m_SvBotAccuracyError) {
 		float Angle = angle(m_Target) + (random_int()%64-32)*pi / 1024.0f;
 		m_Target = direction(Angle)*length(m_Target);
 	}

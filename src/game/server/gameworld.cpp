@@ -14,6 +14,7 @@
 CGameWorld::CGameWorld()
 {
 	m_pGameServer = 0x0;
+	m_pConfig = 0x0;
 	m_pServer = 0x0;
 
 	m_Paused = false;
@@ -33,6 +34,7 @@ CGameWorld::~CGameWorld()
 void CGameWorld::SetGameServer(CGameContext *pGameServer)
 {
 	m_pGameServer = pGameServer;
+	m_pConfig = m_pGameServer->Config();
 	m_pServer = m_pGameServer->Server();
 }
 
@@ -238,7 +240,7 @@ CEntity *CGameWorld::ClosestEntity(vec2 Pos, float Radius, int Type, CEntity *pN
 	float ClosestRange = Radius*2;
 	CEntity *pClosest = 0;
 
-	CEntity *p = GameServer()->m_World.FindFirst(Type);
+	CEntity *p = FindFirst(Type);
 	for(; p; p = p->TypeNext())
  	{
 		if(p == pNotThis)

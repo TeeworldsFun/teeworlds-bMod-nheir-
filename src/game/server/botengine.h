@@ -301,7 +301,7 @@ public:
 	int IntersectSegment(vec2 P1, vec2 P2, vec2 *pPos) const;
 
 	//int GetClosestEdge(vec2 Pos, int ClosestRange, CGraph::CEdge *pEdge);
-	vec2 GetClosestVertex(vec2 Pos);
+	vec2 GetClosestVertex(vec2 Pos) const;
 	double FarestPointOnEdge(CPath *pPath, vec2 Pos, vec2 *pTarget) const;
 	//int DistanceToEdge(CGraph::CEdge Edge, vec2 Pos);
 

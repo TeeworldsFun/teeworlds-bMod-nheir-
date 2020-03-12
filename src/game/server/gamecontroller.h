@@ -4,6 +4,9 @@
 #define GAME_SERVER_GAMECONTROLLER_H
 
 #include <base/vmath.h>
+#include <base/tl/array.h>
+
+#include <game/commands.h>
 
 #include <generated/protocol.h>
 
@@ -15,6 +18,7 @@
 class IGameController
 {
 	class CGameContext *m_pGameServer;
+	class CConfig *m_pConfig;
 	class IServer *m_pServer;
 
 	// activity
@@ -94,6 +98,7 @@ class IGameController
 
 protected:
 	CGameContext *GameServer() const { return m_pGameServer; }
+	CConfig *Config() const { return m_pConfig; }
 	IServer *Server() const { return m_pServer; }
 
 	// game
@@ -164,6 +169,7 @@ public:
 	void OnPlayerDisconnect(class CPlayer *pPlayer);
 	void OnPlayerInfoChange(class CPlayer *pPlayer);
 	void OnPlayerReadyChange(class CPlayer *pPlayer);
+	void OnPlayerCommand(class CPlayer *pPlayer, const char *pCommandName, const char *pCommandArgs);
 
 	void OnReset();
 
@@ -218,6 +224,9 @@ public:
 
 	int GetRealPlayerNum() const { return m_aTeamSize[TEAM_RED]+m_aTeamSize[TEAM_BLUE]; }
 	int GetStartTeam();
+
+	//static void Com_Example(IConsole::IResult *pResult, void *pContext);
+	virtual void RegisterChatCommands(CCommandManager *pManager);
 };
 
 #endif

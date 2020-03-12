@@ -719,7 +719,7 @@ void CBotEngine::SmoothPath(CPath *pPath) const
 			NullVec.y = pPath->m_pVertices[i].y - 1;
 	}
 	bool Smoothed = true;
-	for(int It = 0; It < g_Config.m_SvBotSmoothPath && Smoothed && pPath->m_Size > 2; It++)
+	for(int It = 0; It < GameServer()->Config()->m_SvBotSmoothPath && Smoothed && pPath->m_Size > 2; It++)
 	{
 		Smoothed = false;
 		for(int i = 0; i < pPath->m_Size-2; i++)
