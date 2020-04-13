@@ -197,19 +197,30 @@ void CGameContext::SendChat(int ChatterClientID, int Mode, int To, const char *p
 {
 	char aBuf[256];
 	if(ChatterClientID >= 0 && ChatterClientID < MAX_CLIENTS)
-		str_format(aBuf, sizeof(aBuf), "%d:%d:%s: %s", ChatterClientID, Mode, Server()->ClientName(ChatterClientID), pText);
+	{
+		if(Mode == CHAT_TEAM)
+		{
+			int TeamID = m_apPlayers[ChatterClientID]->GetTeam();
+			str_format(aBuf, sizeof(aBuf), "%d:%d:%d:%s: %s", Mode, TeamID, ChatterClientID, Server()->ClientName(ChatterClientID), pText);
+		}
+		else
+			str_format(aBuf, sizeof(aBuf), "%d:%d:%s: %s", Mode, ChatterClientID, Server()->ClientName(ChatterClientID), pText);
+	}
 	else
 		str_format(aBuf, sizeof(aBuf), "*** %s", pText);
 
-	char aBufMode[32];
+	const char *pModeStr;
 	if(Mode == CHAT_WHISPER)
-		str_copy(aBufMode, "whisper", sizeof(aBufMode));
+		pModeStr = 0;
 	else if(Mode == CHAT_TEAM)
-		str_copy(aBufMode, "teamchat", sizeof(aBufMode));
+		pModeStr = "teamchat";
 	else
-		str_copy(aBufMode, "chat", sizeof(aBufMode));
+		pModeStr = "chat";
 
-	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, aBufMode, aBuf);
+	if(pModeStr)
+	{
+		Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, pModeStr, aBuf);
+	}
 
 
 	CNetMsg_Sv_Chat Msg;
@@ -733,15 +744,7 @@ void CGameContext::OnClientEnter(int ClientID)
 
 void CGameContext::OnClientConnected(int ClientID, bool Dummy, bool AsSpec)
 {
-	if(m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsBot())
-	{
-		OnClientDrop(ClientID, "Everything is awesome");
-	}
-	else if(m_apPlayers[ClientID])
-	{
-		dbg_assert(m_apPlayers[ClientID]->IsDummy(), "invalid clientID");
-		OnClientDrop(ClientID, "removing dummy");
-	}
+	dbg_assert(!m_apPlayers[ClientID], "non-free player slot");
 
 	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, Dummy, AsSpec);
 
@@ -779,7 +782,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	m_pController->OnPlayerDisconnect(m_apPlayers[ClientID]);
 
 	// update clients on drop
-	if(Server()->ClientIngame(ClientID))
+	if(Server()->ClientIngame(ClientID) || IsClientBot(ClientID))
 	{
 		if(Server()->DemoRecorder_IsRecording())
 		{
@@ -805,6 +808,9 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 		if(p->GetOwner() == ClientID)
 			p->LoseOwner();
 	}
+
+	if(m_apPlayers[ClientID]->IsBot())
+		Server()->DelBot(ClientID);
 
 	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
@@ -1545,26 +1551,26 @@ void CGameContext::OnConsoleInit()
 	m_pConfig = Kernel()->RequestInterface<IConfigManager>()->Values();
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
 
-	Console()->Register("tune", "si", CFGFLAG_SERVER, ConTuneParam, this, "Tune variable to value");
+	Console()->Register("tune", "s[tuning] i[value]", CFGFLAG_SERVER, ConTuneParam, this, "Tune variable to value");
 	Console()->Register("tune_reset", "", CFGFLAG_SERVER, ConTuneReset, this, "Reset all tuning variables to defaults");
 	Console()->Register("tunes", "", CFGFLAG_SERVER, ConTunes, this, "List all tuning variables and their values");
 
-	Console()->Register("pause", "?i", CFGFLAG_SERVER|CFGFLAG_STORE, ConPause, this, "Pause/unpause game");
-	Console()->Register("change_map", "?r", CFGFLAG_SERVER|CFGFLAG_STORE, ConChangeMap, this, "Change map");
-	Console()->Register("restart", "?i", CFGFLAG_SERVER|CFGFLAG_STORE, ConRestart, this, "Restart in x seconds (0 = abort)");
-	Console()->Register("say", "r", CFGFLAG_SERVER, ConSay, this, "Say in chat");
-	Console()->Register("broadcast", "r", CFGFLAG_SERVER, ConBroadcast, this, "Broadcast message");
-	Console()->Register("set_team", "ii?i", CFGFLAG_SERVER, ConSetTeam, this, "Set team of player to team");
-	Console()->Register("set_team_all", "i", CFGFLAG_SERVER, ConSetTeamAll, this, "Set team of all players to team");
+	Console()->Register("pause", "?i[seconds]", CFGFLAG_SERVER|CFGFLAG_STORE, ConPause, this, "Pause/unpause game");
+	Console()->Register("change_map", "?r[map]", CFGFLAG_SERVER|CFGFLAG_STORE, ConChangeMap, this, "Change map");
+	Console()->Register("restart", "?i[seconds]", CFGFLAG_SERVER|CFGFLAG_STORE, ConRestart, this, "Restart in x seconds (0 = abort)");
+	Console()->Register("say", "r[text]", CFGFLAG_SERVER, ConSay, this, "Say in chat");
+	Console()->Register("broadcast", "r[text]", CFGFLAG_SERVER, ConBroadcast, this, "Broadcast message");
+	Console()->Register("set_team", "i[id] i[team] ?i[delay]", CFGFLAG_SERVER, ConSetTeam, this, "Set team of player to team");
+	Console()->Register("set_team_all", "i[team]", CFGFLAG_SERVER, ConSetTeamAll, this, "Set team of all players to team");
 	Console()->Register("swap_teams", "", CFGFLAG_SERVER, ConSwapTeams, this, "Swap the current teams");
 	Console()->Register("shuffle_teams", "", CFGFLAG_SERVER, ConShuffleTeams, this, "Shuffle the current teams");
 	Console()->Register("lock_teams", "", CFGFLAG_SERVER, ConLockTeams, this, "Lock/unlock teams");
 	Console()->Register("force_teambalance", "", CFGFLAG_SERVER, ConForceTeamBalance, this, "Force team balance");
 
-	Console()->Register("add_vote", "sr", CFGFLAG_SERVER, ConAddVote, this, "Add a voting option");
-	Console()->Register("remove_vote", "s", CFGFLAG_SERVER, ConRemoveVote, this, "remove a voting option");
+	Console()->Register("add_vote", "s[option] r[command]", CFGFLAG_SERVER, ConAddVote, this, "Add a voting option");
+	Console()->Register("remove_vote", "s[option]", CFGFLAG_SERVER, ConRemoveVote, this, "remove a voting option");
 	Console()->Register("clear_votes", "", CFGFLAG_SERVER, ConClearVotes, this, "Clears the voting options");
-	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
+	Console()->Register("vote", "r['yes'|'no']", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
 }
 
 void CGameContext::NewCommandHook(const CCommandManager::CCommand *pCommand, void *pContext)
@@ -1709,6 +1715,11 @@ void CGameContext::OnPostSnap()
 	m_Events.Clear();
 }
 
+bool CGameContext::IsClientBot(int ClientID) const
+{
+	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsBot();
+}
+
 bool CGameContext::IsClientReady(int ClientID) const
 {
 	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->m_IsReadyToEnter;
@@ -1717,11 +1728,6 @@ bool CGameContext::IsClientReady(int ClientID) const
 bool CGameContext::IsClientPlayer(int ClientID) const
 {
 	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->GetTeam() != TEAM_SPECTATORS;
-}
-
-bool CGameContext::IsClientBot(int ClientID) const
-{
-	return m_apPlayers[ClientID] && m_apPlayers[ClientID]->IsBot();
 }
 
 bool CGameContext::IsClientSpectator(int ClientID) const
@@ -1742,7 +1748,6 @@ void CGameContext::DeleteBot(int i) {
 		dbg_msg("context","Delete bot at slot: %d", i);
 		OnClientDrop(i, "Everything is awesome");
 	}
-	Server()->DelBot(i);
 }
 
 bool CGameContext::AddBot(int i) {
@@ -1762,7 +1767,7 @@ bool CGameContext::AddBot(int i) {
 		m_apPlayers[i]->m_TeeInfos.m_aSkinPartColors[p] = random_int() & 0xffffffff;
 	}
 	OnClientEnter(i);
-	//m_pController->OnPlayerConnect(m_apPlayers[i]);
+
 	return true;
 }
 

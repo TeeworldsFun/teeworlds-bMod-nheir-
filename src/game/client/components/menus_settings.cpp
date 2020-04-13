@@ -510,7 +510,7 @@ void CMenus::RenderSkinPartPalette(CUIRect MainView)
 	for(int p = 0; p < NUM_SKINPARTS; p++)
 	{
 		MainView.VSplitLeft(Width/NUM_SKINPARTS, &Button, &MainView);
-		
+
 		// no palette if color is unused for this skin parts
 		static int s_aColorPalettes[NUM_SKINPARTS];
 		if(*CSkins::ms_apUCCVariables[p])
@@ -520,7 +520,7 @@ void CMenus::RenderSkinPartPalette(CUIRect MainView)
 			Button.VSplitRight(HMargin, &Button, 0);
 
 			vec4 PartColor = m_pClient->m_pSkins->GetColorV4(*CSkins::ms_apColorVariables[p], p==SKINPART_MARKING);
-			
+
 			bool Hovered = UI()->HotItem() == &s_aColorPalettes[p];
 			bool Clicked = UI()->DoButtonLogic(&s_aColorPalettes[p], &Button);
 			bool Selected = m_TeePartSelected == p;
@@ -623,7 +623,7 @@ int CMenus::ThemeIconScan(const char *pName, int IsDir, int DirType, void *pUser
 	{
 		if(str_comp(r.front().m_Name, aThemeName) == 0 || (!r.front().m_Name[0] && str_comp(aThemeName, "none") == 0))
 		{
-			char aBuf[512];
+			char aBuf[IO_MAX_PATH_LENGTH];
 			str_format(aBuf, sizeof(aBuf), "ui/themes/%s", pName);
 			CImageInfo Info;
 			if(!pSelf->Graphics()->LoadPNG(&Info, aBuf, DirType))
@@ -855,7 +855,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	BottomView.HSplitTop(20.f, 0, &BottomView);
 
 	// render game menu backgrounds
-	int NumOptions = max(Config()->m_ClNameplates ? 6 : 3, Config()->m_ClShowsocial ? 5 : 4);
+	int NumOptions = max(Config()->m_ClNameplates ? 6 : 3, Config()->m_ClShowsocial ? 6 : 5);
 	float ButtonHeight = 20.0f;
 	float Spacing = 2.0f;
 	float BackgroundHeight = (float)(NumOptions+1)*ButtonHeight+(float)NumOptions*Spacing;
@@ -970,7 +970,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		GameRight.HSplitTop(Spacing, 0, &GameRight);
 		GameRight.HSplitTop(ButtonHeight, &Button, &GameRight);
 		Button.VSplitLeft(ButtonHeight, 0, &Button);
-		RenderTools()->DrawUIRect(&Button, vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_ALL, 5.0f);
+		/*RenderTools()->DrawUIRect(&Button, vec4(0.0f, 0.0f, 0.0f, 0.25f), CUI::CORNER_ALL, 5.0f);
 		CUIRect Text;
 		Button.VSplitLeft(ButtonHeight+5.0f, 0, &Button);
 		Button.VSplitLeft(200.0f, &Text, &Button);
@@ -989,7 +989,10 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 			str_format(aBuf, sizeof(aBuf), Localize("no one", "Show chat messages from:"));
 		static CButtonContainer s_ButtonFilterchat;
 		if(DoButton_Menu(&s_ButtonFilterchat, aBuf, 0, &Button))
-			Config()->m_ClFilterchat = (Config()->m_ClFilterchat + 1) % 3;
+			Config()->m_ClFilterchat = (Config()->m_ClFilterchat + 1) % 3;*/
+		const int NumLabels = 3;
+		const char *aLabels[NumLabels] = { Localize("everyone", "Show chat messages from"), Localize("friends only", "Show chat messages from"), Localize("no one", "Show chat messages from")};
+		DoScrollbarOptionLabeled(&Config()->m_ClFilterchat, &Config()->m_ClFilterchat, &Button, Localize("Show chat messages from"), aLabels, NumLabels);
 	}
 
 	GameRight.HSplitTop(Spacing, 0, &GameRight);
@@ -998,6 +1001,13 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 	if(DoButton_CheckBox(&s_EnableColoredBroadcasts, Localize("Enable colored server broadcasts"),
 						 Config()->m_ClColoredBroadcast, &Button))
 		Config()->m_ClColoredBroadcast ^= 1;
+	
+	GameRight.HSplitTop(Spacing, 0, &GameRight);
+	GameRight.HSplitTop(ButtonHeight, &Button, &GameRight);
+	static int s_DisableWhisperFeature = 0;
+	if(DoButton_CheckBox(&s_DisableWhisperFeature, Localize("Disable whisper feature"),
+						 Config()->m_ClDisableWhisper, &Button))
+		Config()->m_ClDisableWhisper ^= 1;
 
 	// render client menu
 	Client.HSplitTop(ButtonHeight, &Label, &Client);
@@ -1550,11 +1560,11 @@ float CMenus::RenderSettingsControlsStats(CUIRect View)
 	View.HSplitTop(20.0f, &Button, &View);
 	if(DoButton_CheckBox(&Config()->m_ClStatboardInfos+5, Localize("Frags per minute"), Config()->m_ClStatboardInfos & TC_STATS_FPM, &Button))
 		Config()->m_ClStatboardInfos ^= TC_STATS_FPM;
-		
+
 	View.HSplitTop(20.0f, &Button, &View);
 	if(DoButton_CheckBox(&Config()->m_ClStatboardInfos+6, Localize("Current spree"), Config()->m_ClStatboardInfos & TC_STATS_SPREE, &Button))
 		Config()->m_ClStatboardInfos ^= TC_STATS_SPREE;
-		
+
 	View.HSplitTop(20.0f, &Button, &View);
 	if(DoButton_CheckBox(&Config()->m_ClStatboardInfos+7, Localize("Best spree"), Config()->m_ClStatboardInfos & TC_STATS_BESTSPREE, &Button))
 		Config()->m_ClStatboardInfos ^= TC_STATS_BESTSPREE;

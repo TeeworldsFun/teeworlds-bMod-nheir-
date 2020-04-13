@@ -199,9 +199,9 @@ public:
 	virtual void OnClientDirectInput(int ClientID, void *pInput);
 	virtual void OnClientPredictedInput(int ClientID, void *pInput);
 
+	virtual bool IsClientBot(int ClientID) const;
 	virtual bool IsClientReady(int ClientID) const;
 	virtual bool IsClientPlayer(int ClientID) const;
-	virtual bool IsClientBot(int ClientID) const;
 	virtual bool IsClientSpectator(int ClientID) const;
 
 	virtual const char *GameType() const;
