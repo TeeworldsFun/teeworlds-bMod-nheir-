@@ -171,9 +171,8 @@ public:
 	void SendTuningParams(int ClientID);
 
 	// Bot slots
-	virtual void DeleteBot(int i);
+	void DeleteBot(int i);
 	bool AddBot(int i);
-	virtual bool ReplacePlayerByBot(int ClientID);
 	void CheckBotNumber();
 
 	//

@@ -1771,31 +1771,6 @@ bool CGameContext::AddBot(int i) {
 	return true;
 }
 
-bool CGameContext::ReplacePlayerByBot(int ClientID) {
-	if(!m_apPlayers[ClientID])
-		return false;
-	int BotNumber = 0;
-	int PlayerCount = -1;
-	for(int i = 0 ; i < MAX_CLIENTS ; ++i) {
-		if(!m_apPlayers[i])
-			continue;
-		if(i == ClientID)
-			continue;
-		if(m_apPlayers[i]->m_IsBot)
-			BotNumber++;
-		else
-			PlayerCount++;
-	}
-	if(!PlayerCount || BotNumber >= Config()->m_SvBotSlots)
-		return false;
-	m_apPlayers[ClientID]->m_IsBot = true;
-	m_apPlayers[ClientID]->m_pBot = new CBot(m_pBotEngine, m_apPlayers[ClientID]);
-	Server()->SetClientName(ClientID, g_aBotName[ClientID % 16]);
-	Server()->SetClientClan(ClientID, g_BotClan);
-	dbg_msg("context","Replace player by bot at slot: %d", ClientID);
-	return true;
-}
-
 void CGameContext::CheckBotNumber() {
 	int BotNumber = 0;
 	int PlayerCount = 0;
