@@ -49,7 +49,7 @@ void CBot::OnReset()
 {
 	m_Flags = 0;
 	m_pPath->m_Size = 0;
-	m_ComputeTarget.m_Type = CTarget::TARGET_EMPTY;
+	m_ComputeTarget.m_Type = CTarget::TARGET_HEALTH;
 	//m_Genetics.SetFitness(m_GenomeTick);
 	//m_Genetics.NextGenome();
 	//m_GenomeTick = 0;
@@ -219,7 +219,7 @@ void CBot::UpdateTarget()
 		}
 	}
 
-	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER)
+	if(m_ComputeTarget.m_Type == CTarget::TARGET_PLAYER && m_pPlayer->GetCharacter()->GetHealth() > 7 && m_pPlayer->GetCharacter()->GetArmor() > 7)
 	{
 		CPlayer *pPlayer = GameServer()->m_apPlayers[m_ComputeTarget.m_PlayerCID];
 		if(Collision()->FastIntersectLine(m_ComputeTarget.m_Pos, pPlayer->GetCharacter()->GetPos(),0,0))
@@ -235,15 +235,15 @@ bool CBot::NeedPickup(int Type)
 	switch(Type)
 	{
 	case CTarget::TARGET_HEALTH:
-		return m_pPlayer->GetCharacter()->GetHealth() < 5;
+		return m_pPlayer->GetCharacter()->GetHealth() < 10;
 	case CTarget::TARGET_ARMOR:
-		return m_pPlayer->GetCharacter()->GetArmor() < 5;
+		return m_pPlayer->GetCharacter()->GetArmor() < 10;
 	case CTarget::TARGET_WEAPON_SHOTGUN:
-		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_SHOTGUN) < 5;
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_SHOTGUN) < 10;
 	case CTarget::TARGET_WEAPON_GRENADE:
-		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_GRENADE) < 5;
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_GRENADE) < 10;
 	case CTarget::TARGET_WEAPON_LASER:
-		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_RIFLE) < 5;
+		return m_pPlayer->GetCharacter()->GetAmmoCount(WEAPON_RIFLE) < 10;
 	}
 	return false;
 }

@@ -9,24 +9,24 @@
 #include "ai/genetics.h"
 #include "ai/strategy.h"
 
-const char g_BotClan[12] = "Love";
-const char g_aBotName[MAX_CLIENTS][16] = {
-	"Anna",
-	"Bob",
-	"Carlos",
-	"David",
-	"Eli",
-	"Florianne",
-	"Gaia",
-	"Hannibal",
-	"Isis",
-	"Juda",
-	"Kevin",
-	"Lucile",
-	"Marc",
-	"Naustradamus",
-	"Ondine",
-	"Platon"
+const char g_BotClan[12] = "CHNFun";
+const char g_aBotName[MAX_CLIENTS][32] = {
+	"BOT_Moker",
+	"BOT_Rice",
+	"BOT_DZMC-ququ",
+	"BOT_Ark",
+	"BOT_Eki",
+	"BOT_df!",
+	"BOT_MC-TYH",
+	"BOT_Texas.C",
+	"BOT_KuNao",
+	"BOT_Tom",
+	"BOT_TsFreddi",
+	"BOT_shengyan",
+	"BOT_Chara",
+	"BOT_Jotaro",
+	"BOT_The-World!",
+	"FlowerFell-Sans!"
 };
 
 const int g_aBotPriority[MAX_CLIENTS][8] = {
